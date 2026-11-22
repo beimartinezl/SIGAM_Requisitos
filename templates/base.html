@@ -15,7 +15,10 @@
 <nav class="sidebar">
   <div class="nav-label">MENÚ PRINCIPAL</div>
   <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint=='index' else '' }}">▦ <span>Inicio</span></a>
-  <a href="{{ url_for('activos') }}" class="{{ 'active' if request.endpoint in ['activos','activo_form','activo_detalle'] else '' }}">▣ <span>Equipos</span></a>
+  <a href="{{ url_for('activos') }}" class="{{ 'active' if request.endpoint in ['activos','activo_form','activo_detalle','importar_activos'] else '' }}">▣ <span>Equipos</span></a>
+  {% if g.user.rol in ['Administrador','Supervisor'] %}
+  <a href="{{ url_for('importar_activos') }}" class="{{ 'active' if request.endpoint=='importar_activos' else '' }}">⇧ <span>Importar Excel</span></a>
+  {% endif %}
   <a href="{{ url_for('avisos') }}" class="{{ 'active' if request.endpoint in ['avisos','aviso_nuevo'] else '' }}">⚑ <span>Informar falla</span></a>
   <a href="{{ url_for('ordenes') }}" class="{{ 'active' if request.endpoint in ['ordenes','orden_detalle'] else '' }}">☷ <span>Trabajos</span></a>
   <a href="{{ url_for('historial') }}" class="{{ 'active' if request.endpoint=='historial' else '' }}">◷ <span>Historial</span></a>

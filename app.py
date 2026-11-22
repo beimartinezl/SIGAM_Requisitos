@@ -6,6 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_wtf.csrf import CSRFProtect
 from pathlib import Path
 from datetime import date, timedelta
+from io import BytesIO
 
 app = Flask(__name__)
 # La clave se conserva entre reinicios. En despliegues administrados debe definirse SIGAM_SECRET_KEY.
@@ -143,7 +144,7 @@ def load_user_and_enforce_access():
 
     role = g.user["rol"]
     admin_only = {"usuarios", "usuario_nuevo", "usuario_estado", "usuario_actualizar", "prueba"}
-    supervisor_or_admin = {"activo_form", "desactivar_activo", "crear_orden"}
+    supervisor_or_admin = {"activo_form", "desactivar_activo", "crear_orden", "importar_activos"}
     if endpoint == "orden_detalle" and request.method == "POST":
         supervisor_or_admin.add(endpoint)
     if endpoint in admin_only and role != "Administrador":
@@ -296,6 +297,95 @@ def activos():
             WHERE codigo LIKE ? OR nombre LIKE ? OR ubicacion LIKE ?
             ORDER BY id DESC""", (f"%{q}%", f"%{q}%", f"%{q}%")).fetchall()
     return render_template("activos.html", activos=rows, q=q)
+
+@app.route("/activos/importar", methods=["GET", "POST"])
+def importar_activos():
+    if request.method == "POST":
+        archivo = request.files.get("archivo")
+        if not archivo or not archivo.filename:
+            flash("Selecciona un archivo Excel (.xlsx).", "error")
+            return redirect(url_for("importar_activos"))
+        if not archivo.filename.lower().endswith(".xlsx"):
+            flash("Formato no válido. Sube un archivo .xlsx.", "error")
+            return redirect(url_for("importar_activos"))
+        try:
+            from openpyxl import load_workbook
+            libro = load_workbook(BytesIO(archivo.read()), read_only=True, data_only=True)
+            hoja = libro.active
+            filas = hoja.iter_rows(values_only=True)
+            encabezados = next(filas, None)
+            if not encabezados:
+                flash("El archivo está vacío.", "error")
+                return redirect(url_for("importar_activos"))
+            normalizar = lambda v: str(v or "").strip().lower()
+            mapa = {normalizar(v): i for i, v in enumerate(encabezados)}
+            requeridas = {"codigo", "nombre", "categoria", "ubicacion"}
+            if not requeridas.issubset(mapa):
+                flash("La primera fila debe contener: codigo, nombre, categoria y ubicacion.", "error")
+                return redirect(url_for("importar_activos"))
+            validos, errores, codigos_archivo = [], [], set()
+            for numero, fila in enumerate(filas, start=2):
+                valores = [fila[mapa[k]] if mapa[k] < len(fila) else None for k in
+                           ("codigo", "nombre", "categoria", "ubicacion")]
+                codigo, nombre, categoria, ubicacion = [str(v).strip() if v is not None else "" for v in valores]
+                if not any((codigo, nombre, categoria, ubicacion)):
+                    continue
+                if not codigo or not nombre or not ubicacion:
+                    errores.append(f"Fila {numero}: código, nombre y ubicación son obligatorios.")
+                    continue
+                clave = codigo.casefold()
+                if clave in codigos_archivo:
+                    errores.append(f"Fila {numero}: código duplicado dentro del archivo ({codigo}).")
+                    continue
+                codigos_archivo.add(clave)
+                validos.append((codigo, nombre, categoria, ubicacion, numero))
+            if not validos and not errores:
+                flash("No se encontraron filas para importar.", "error")
+                return redirect(url_for("importar_activos"))
+            importados, duplicados = 0, []
+            with connect() as con:
+                existentes = {r[0].casefold() for r in con.execute("SELECT codigo FROM activos")}
+                for codigo, nombre, categoria, ubicacion, numero in validos:
+                    if codigo.casefold() in existentes:
+                        duplicados.append(f"Fila {numero}: el código {codigo} ya existe en SIGAM.")
+                        continue
+                    con.execute("INSERT INTO activos(codigo,nombre,categoria,ubicacion) VALUES(?,?,?,?)",
+                                (codigo, nombre, categoria, ubicacion))
+                    existentes.add(codigo.casefold())
+                    importados += 1
+            libro.close()
+            if importados:
+                flash(f"Importación completada: {importados} activo(s) incorporado(s).", "success")
+            if duplicados or errores:
+                detalle = " ".join((duplicados + errores)[:5])
+                restante = len(duplicados) + len(errores) - 5
+                if restante > 0:
+                    detalle += f" Y {restante} error(es) adicional(es)."
+                flash(f"Se omitieron {len(duplicados) + len(errores)} fila(s). {detalle}", "error")
+            return redirect(url_for("activos"))
+        except Exception:
+            app.logger.exception("Error al importar archivo Excel")
+            flash("No se pudo leer el archivo. Verifica que sea un Excel .xlsx válido y usa la plantilla SIGAM.", "error")
+            return redirect(url_for("importar_activos"))
+    return render_template("importar_activos.html")
+
+
+@app.route("/activos/plantilla.xlsx")
+def plantilla_activos():
+    from openpyxl import Workbook
+    from flask import send_file
+    libro = Workbook()
+    hoja = libro.active
+    hoja.title = "Activos"
+    hoja.append(["codigo", "nombre", "categoria", "ubicacion"])
+    hoja.append(["EQ-001", "Bomba de agua", "Equipo", "Planta 1"])
+    hoja.append(["EQ-002", "Compresor", "Equipo", "Planta 2"])
+    salida = BytesIO()
+    libro.save(salida)
+    salida.seek(0)
+    return send_file(salida, as_attachment=True, download_name="plantilla_activos_sigam.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
 
 @app.route("/activos/nuevo", methods=["GET", "POST"])
 @app.route("/activos/<int:aid>/editar", methods=["GET", "POST"])
