@@ -1,17 +1,17 @@
 {% extends "base.html" %}{% block title %}Inicio | SIGAM{% endblock %}
 {% block content %}
-<div class="page-head"><div><div class="eyebrow">PANEL GENERAL</div><h1>Resumen de mantenimiento</h1><p class="muted">Vista general del estado de los activos y actividades.</p></div><a class="btn primary" href="{{ url_for('aviso_nuevo') }}">＋ Registrar falla</a></div>
+<div class="page-head"><div><div class="eyebrow">PANEL GENERAL</div><h1>¿Qué necesitas hacer hoy?</h1><p class="muted">Elige una opción para comenzar. No necesitas conocimientos técnicos para registrar una falla.</p></div><a class="btn primary" href="{{ url_for('aviso_nuevo') }}">＋ Registrar falla</a></div>
 <div class="stats">
-<div class="stat"><div class="stat-icon blue">▣</div><div><span>Activos activos</span><strong>{{ stats.activos }}</strong></div></div>
-<div class="stat"><div class="stat-icon orange">⚑</div><div><span>Avisos abiertos</span><strong>{{ stats.avisos }}</strong></div></div>
-<div class="stat"><div class="stat-icon purple">◷</div><div><span>Órdenes pendientes</span><strong>{{ stats.pendientes }}</strong></div></div>
-<div class="stat"><div class="stat-icon green">✓</div><div><span>Órdenes finalizadas</span><strong>{{ stats.finalizadas }}</strong></div></div>
+<div class="stat"><div class="stat-icon blue">▣</div><div><span>Equipos registrados</span><strong>{{ stats.activos }}</strong></div></div>
+<div class="stat"><div class="stat-icon orange">⚑</div><div><span>Fallas por revisar</span><strong>{{ stats.avisos }}</strong></div></div>
+<div class="stat"><div class="stat-icon purple">◷</div><div><span>Trabajos pendientes</span><strong>{{ stats.pendientes }}</strong></div></div>
+<div class="stat"><div class="stat-icon green">✓</div><div><span>Trabajos terminados</span><strong>{{ stats.finalizadas }}</strong></div></div>
 </div>
-<div class="section-head"><div><h2>Actividad reciente</h2><p class="muted">Últimos avisos de mantenimiento registrados</p></div><a class="text-link" href="{{ url_for('avisos') }}">Ver todos →</a></div>
+<div class="section-head"><div><h2>Últimas fallas informadas</h2><p class="muted">Aquí puedes revisar los problemas informados recientemente.</p></div><a class="text-link" href="{{ url_for('avisos') }}">Ver todos →</a></div>
 <div class="panel table-panel">
 {% if recientes %}<div class="table-wrap"><table><thead><tr><th>Activo</th><th>Descripción</th><th>Fecha</th><th>Prioridad</th><th>Estado</th></tr></thead><tbody>
 {% for r in recientes %}<tr><td><b>{{ r.codigo }}</b><small>{{ r.nombre }}</small></td><td>{{ r.descripcion }}</td><td>{{ r.fecha }}</td><td><span class="priority {{ r.prioridad|lower }}">{{ r.prioridad }}</span></td><td>{{ r.estado }}</td></tr>{% endfor %}
 </tbody></table></div>{% else %}<div class="empty"><div class="empty-icon">▤</div><b>Aún no hay avisos registrados</b><p>Cuando registres una falla, aparecerá aquí.</p><a class="btn primary" href="{{ url_for('aviso_nuevo') }}">Registrar primer aviso</a></div>{% endif %}
 </div>
-<div class="quick-grid"><a class="quick-card" href="{{ url_for('activos') }}"><span>▣</span><b>Administrar activos</b><small>Consultar y mantener el catálogo</small></a><a class="quick-card" href="{{ url_for('ordenes') }}"><span>☷</span><b>Órdenes de trabajo</b><small>Revisar trabajos y avances</small></a><a class="quick-card" href="{{ url_for('historial') }}"><span>◷</span><b>Historial por activo</b><small>Consultar intervenciones anteriores</small></a></div>
+<div class="quick-grid"><a class="quick-card" href="{{ url_for('activos') }}"><span>▣</span><b>Ver mis equipos</b><small>Buscar o registrar equipos</small></a><a class="quick-card" href="{{ url_for('ordenes') }}"><span>☷</span><b>Trabajos de mantenimiento</b><small>Consultar qué trabajos están pendientes</small></a><a class="quick-card" href="{{ url_for('historial') }}"><span>◷</span><b>Historial de equipos</b><small>Ver fallas y trabajos anteriores</small></a></div>
 {% endblock %}

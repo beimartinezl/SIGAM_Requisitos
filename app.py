@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, abort
 import sqlite3
 from pathlib import Path
-from datetime import date
+from datetime import date, timedelta
 
 app = Flask(__name__)
 app.secret_key = "sigam-demo-local"
@@ -47,6 +47,22 @@ def init_db():
             descripcion TEXT NOT NULL,
             fecha TEXT NOT NULL,
             responsable TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS suscripcion (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            plan TEXT NOT NULL,
+            estado TEXT NOT NULL,
+            inicio TEXT,
+            fin_prueba TEXT,
+            precio_clp INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS pruebas_usabilidad (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            participante TEXT NOT NULL,
+            completo INTEGER NOT NULL,
+            duracion_segundos INTEGER NOT NULL,
+            dificultad TEXT DEFAULT '',
+            fecha TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
         """)
 
@@ -210,6 +226,56 @@ def historial():
             WHERE a.codigo LIKE ? OR a.nombre LIKE ? OR a.ubicacion LIKE ?
             GROUP BY a.id ORDER BY a.codigo""", (f"%{q}%",f"%{q}%",f"%{q}%")).fetchall()
     return render_template("historial.html", activos=rows, q=q)
+
+@app.route("/prueba", methods=["GET", "POST"])
+def prueba():
+    with connect() as con:
+        if request.method == "POST":
+            accion = request.form.get("accion")
+            if accion == "iniciar_prueba":
+                inicio = date.today()
+                fin = inicio + timedelta(days=14)
+                con.execute("""INSERT INTO suscripcion(id,plan,estado,inicio,fin_prueba,precio_clp)
+                    VALUES(1,'Prueba gratuita','En prueba',?,?,0)
+                    ON CONFLICT(id) DO UPDATE SET plan='Prueba gratuita',estado='En prueba',
+                    inicio=excluded.inicio,fin_prueba=excluded.fin_prueba,precio_clp=0""",
+                    (inicio.isoformat(), fin.isoformat()))
+                flash("Tu prueba gratuita de 14 días está activa en esta demostración.", "success")
+            elif accion == "seleccionar_plan":
+                plan = request.form.get("plan")
+                precios = {"Básico": 19990, "Pyme": 39990}
+                if plan not in precios:
+                    abort(400)
+                con.execute("""INSERT INTO suscripcion(id,plan,estado,precio_clp)
+                    VALUES(1,?,'Pendiente de contratación',?)
+                    ON CONFLICT(id) DO UPDATE SET plan=excluded.plan,estado='Pendiente de contratación',
+                    precio_clp=excluded.precio_clp,inicio=NULL,fin_prueba=NULL""", (plan,precios[plan]))
+                flash("Plan seleccionado. Esta demostración no realiza cobros.", "success")
+            elif accion == "guardar_prueba":
+                participante = request.form.get("participante", "").strip()
+                dificultad = request.form.get("dificultad", "").strip()
+                try:
+                    duracion = int(request.form.get("duracion", "0"))
+                except ValueError:
+                    duracion = 0
+                completo = 1 if request.form.get("completo") == "si" else 0
+                if not participante or duracion < 0:
+                    flash("Indica un participante y una duración válida.", "error")
+                else:
+                    con.execute("INSERT INTO pruebas_usabilidad(participante,completo,duracion_segundos,dificultad) VALUES(?,?,?,?)",
+                                (participante,completo,duracion,dificultad))
+                    flash("Resultado de prueba de usabilidad guardado.", "success")
+            return redirect(url_for("prueba"))
+        suscripcion = con.execute("SELECT * FROM suscripcion WHERE id=1").fetchone()
+        if suscripcion and suscripcion["estado"] == "En prueba" and suscripcion["fin_prueba"] < date.today().isoformat():
+            con.execute("UPDATE suscripcion SET estado='Prueba finalizada' WHERE id=1")
+            suscripcion = con.execute("SELECT * FROM suscripcion WHERE id=1").fetchone()
+        pruebas = con.execute("SELECT * FROM pruebas_usabilidad ORDER BY id DESC LIMIT 8").fetchall()
+    dias_restantes = None
+    if suscripcion and suscripcion["estado"] == "En prueba":
+        dias_restantes = max(0, (date.fromisoformat(suscripcion["fin_prueba"]) - date.today()).days)
+    return render_template("prueba.html", suscripcion=suscripcion, dias_restantes=dias_restantes, pruebas=pruebas)
+
 
 if __name__ == "__main__":
     init_db()

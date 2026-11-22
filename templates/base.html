@@ -15,11 +15,12 @@
 <nav class="sidebar">
   <div class="nav-label">MENÚ PRINCIPAL</div>
   <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint=='index' else '' }}">▦ <span>Inicio</span></a>
-  <a href="{{ url_for('activos') }}" class="{{ 'active' if request.endpoint in ['activos','activo_form','activo_detalle'] else '' }}">▣ <span>Activos</span></a>
-  <a href="{{ url_for('avisos') }}" class="{{ 'active' if request.endpoint in ['avisos','aviso_nuevo'] else '' }}">⚑ <span>Avisos</span></a>
-  <a href="{{ url_for('ordenes') }}" class="{{ 'active' if request.endpoint in ['ordenes','orden_detalle'] else '' }}">☷ <span>Órdenes de trabajo</span></a>
+  <a href="{{ url_for('activos') }}" class="{{ 'active' if request.endpoint in ['activos','activo_form','activo_detalle'] else '' }}">▣ <span>Equipos</span></a>
+  <a href="{{ url_for('avisos') }}" class="{{ 'active' if request.endpoint in ['avisos','aviso_nuevo'] else '' }}">⚑ <span>Informar falla</span></a>
+  <a href="{{ url_for('ordenes') }}" class="{{ 'active' if request.endpoint in ['ordenes','orden_detalle'] else '' }}">☷ <span>Trabajos</span></a>
   <a href="{{ url_for('historial') }}" class="{{ 'active' if request.endpoint=='historial' else '' }}">◷ <span>Historial</span></a>
-  <div class="sidebar-note"><b>Versión académica</b><p>Los datos se guardan localmente en SQLite en este equipo.</p></div>
+  <a href="{{ url_for('prueba') }}" class="{{ 'active' if request.endpoint=='prueba' else '' }}">★ <span>Prueba y planes</span></a>
+  <div class="sidebar-note"><b>Ayuda rápida</b><p>Usa los botones grandes y completa solo los datos solicitados. Si tienes dudas, vuelve al Inicio.</p></div>
 </nav>
 <main class="content">
   {% with messages = get_flashed_messages(with_categories=true) %}
