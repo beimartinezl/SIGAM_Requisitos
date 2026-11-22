@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, abort
 import sqlite3
+import os
 from pathlib import Path
 from datetime import date, timedelta
 
@@ -8,13 +9,20 @@ app.secret_key = "sigam-demo-local"
 DB = Path(__file__).with_name("sigam.db")
 
 def connect():
-    con = sqlite3.connect(DB)
+    # Cada solicitud abre su propia conexión al archivo central del servidor.
+    # SQLite espera brevemente si otra solicitud está realizando una escritura.
+    con = sqlite3.connect(DB, timeout=15)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA foreign_keys = ON")
+    con.execute("PRAGMA busy_timeout = 15000")
     return con
 
 def init_db():
+    # WAL mejora la convivencia entre lecturas y escrituras concurrentes.
+    # La base debe permanecer en el disco local del computador servidor,
+    # no dentro de una carpeta compartida de red.
     with connect() as con:
+        con.execute("PRAGMA journal_mode = WAL")
         con.executescript("""
         CREATE TABLE IF NOT EXISTS activos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -279,4 +287,8 @@ def prueba():
 
 if __name__ == "__main__":
     init_db()
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    # 0.0.0.0 permite que otros dispositivos de la LAN lleguen al servidor.
+    # No publicar este servidor de demostración directamente en Internet.
+    host = os.environ.get("SIGAM_HOST", "0.0.0.0")
+    port = int(os.environ.get("SIGAM_PORT", "5000"))
+    app.run(host=host, port=port, debug=False, threaded=True)
