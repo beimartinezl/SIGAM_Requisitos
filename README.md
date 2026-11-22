@@ -73,3 +73,13 @@ Roles:
 El sistema almacena contraseñas como hashes, utiliza protección CSRF en formularios y controla permisos en el servidor. Las cuentas se pueden activar o desactivar desde el menú Usuarios. Las contraseñas deben tener al menos 10 caracteres.
 
 **Seguridad:** esta versión conserva SQLite y el acceso LAN de v4.0. No debe exponerse directamente a Internet. Para un despliegue cloud se requiere HTTPS, configuración segura de secretos, copias de seguridad y una revisión adicional de seguridad; además, se recomienda PostgreSQL para concurrencia y crecimiento.
+
+
+## Importación de activos desde Excel (v4.3)
+
+- Disponible para Administrador y Supervisor desde el menú “Importar Excel”.
+- Descarga la plantilla `.xlsx`, completa código, nombre, categoría y ubicación, y súbela.
+- Código, nombre y ubicación son obligatorios.
+- Los códigos repetidos en el archivo o ya existentes en SIGAM se omiten y se informan.
+- Las filas válidas se guardan en la base central SQLite del servidor.
+- Se requiere `openpyxl`, incluido en `requirements.txt`.

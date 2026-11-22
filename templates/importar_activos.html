@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Importar activos · SIGAM{% endblock %}
+{% block content %}
+<section class="page-heading"><div><p class="eyebrow">INVENTARIO</p><h1>Importar activos desde Excel</h1><p class="muted">Carga varios activos utilizando una plantilla .xlsx.</p></div></section>
+<section class="panel"><h2>1. Descarga la plantilla</h2><p>Completa las columnas <b>codigo</b>, <b>nombre</b>, <b>categoria</b> y <b>ubicacion</b>. Código, nombre y ubicación son obligatorios.</p><a class="button secondary" href="{{ url_for('plantilla_activos') }}">Descargar plantilla Excel</a></section>
+<section class="panel"><h2>2. Selecciona el archivo completado</h2><form method="post" enctype="multipart/form-data"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label for="archivo">Archivo Excel (.xlsx)</label><input id="archivo" name="archivo" type="file" accept=".xlsx" required><p class="muted">Los códigos existentes o repetidos se omiten. Las filas con campos obligatorios vacíos se informan como errores.</p><button type="submit">Validar e importar activos</button></form></section>
+{% endblock %}
