@@ -59,3 +59,15 @@ Esta versión implementa acceso compartido en red local con una base de datos ce
 ## Prueba de usabilidad
 
 El objetivo académico es que una persona pueda registrar un aviso sencillo desde un celular en un máximo de 2 minutos. Este objetivo debe validarse con personas reales; el diseño por sí solo no demuestra que se cumpla.
+
+
+## Pruebas automatizadas (SIGAM v4.1)
+
+Se incorpora una batería de pruebas automatizadas para comprobar las rutas principales y operaciones del sistema usando una base SQLite temporal, sin modificar los datos reales de la aplicación.
+
+1. Abre una terminal dentro de la carpeta `SIGAM`.
+2. Instala las dependencias de desarrollo con: `python -m pip install -r requirements-dev.txt`
+3. Ejecuta: `python -m pytest -v`
+4. Revisa el resumen de pruebas aprobadas o fallidas que muestra la terminal.
+
+Las pruebas cubren páginas principales, registro/búsqueda/edición/desactivación de activos, validaciones, avisos, órdenes de trabajo, intervenciones, estados, errores 404 y registro de resultados de usabilidad. No se conectan a la red LAN ni sustituyen pruebas reales con usuarios. Tampoco usan IA generativa: son pruebas automatizadas deterministas que entregan resultados reproducibles.
