@@ -1,0 +1,4 @@
+{% extends "base_auth.html" %}{% block title %}Configurar SIGAM{% endblock %}{% block content %}
+<h1>Configurar SIGAM</h1><p class="muted">Crea la primera cuenta. Esta cuenta tendrá permisos de administrador.</p>
+<form method="post" class="panel form-panel"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label>Nombre completo<input name="nombre" required maxlength="100"></label><label>Nombre de usuario<input name="username" required maxlength="50" autocomplete="username"></label><label>Contraseña (mínimo 10 caracteres)<input type="password" name="password" required minlength="10" autocomplete="new-password"></label><label>Confirmar contraseña<input type="password" name="confirm" required minlength="10" autocomplete="new-password"></label><button class="btn primary block">Crear administrador</button></form>
+{% endblock %}

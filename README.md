@@ -59,3 +59,17 @@ Esta versión implementa acceso compartido en red local con una base de datos ce
 ## Prueba de usabilidad
 
 El objetivo académico es que una persona pueda registrar un aviso sencillo desde un celular en un máximo de 2 minutos. Este objetivo debe validarse con personas reales; el diseño por sí solo no demuestra que se cumpla.
+
+
+## Cuentas y niveles de acceso (v4.2)
+
+Al iniciar SIGAM por primera vez, abre `http://127.0.0.1:5000/configurar` y crea la primera cuenta de Administrador. No existe una contraseña predeterminada. Después, cada usuario inicia sesión con su nombre de usuario y contraseña.
+
+Roles:
+- **Administrador:** acceso completo y administración de usuarios.
+- **Supervisor:** gestiona activos, avisos y órdenes de trabajo.
+- **Trabajador:** consulta información, registra avisos y agrega intervenciones. No puede editar activos, crear órdenes ni cambiar estados de órdenes.
+
+El sistema almacena contraseñas como hashes, utiliza protección CSRF en formularios y controla permisos en el servidor. Las cuentas se pueden activar o desactivar desde el menú Usuarios. Las contraseñas deben tener al menos 10 caracteres.
+
+**Seguridad:** esta versión conserva SQLite y el acceso LAN de v4.0. No debe exponerse directamente a Internet. Para un despliegue cloud se requiere HTTPS, configuración segura de secretos, copias de seguridad y una revisión adicional de seguridad; además, se recomienda PostgreSQL para concurrencia y crecimiento.

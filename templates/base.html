@@ -9,7 +9,7 @@
 <body>
 <header class="topbar">
   <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">S</span><span>SIGAM<small>Gestión de activos y mantenimiento</small></span></a>
-  <span class="local-tag">MVP LOCAL</span>
+  <div class="user-area"><span class="user-chip">{{ g.user.nombre }} · {{ g.user.rol }}</span><form method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="logout-btn">Cerrar sesión</button></form></div>
 </header>
 <div class="layout">
 <nav class="sidebar">
@@ -19,7 +19,10 @@
   <a href="{{ url_for('avisos') }}" class="{{ 'active' if request.endpoint in ['avisos','aviso_nuevo'] else '' }}">⚑ <span>Informar falla</span></a>
   <a href="{{ url_for('ordenes') }}" class="{{ 'active' if request.endpoint in ['ordenes','orden_detalle'] else '' }}">☷ <span>Trabajos</span></a>
   <a href="{{ url_for('historial') }}" class="{{ 'active' if request.endpoint=='historial' else '' }}">◷ <span>Historial</span></a>
+  {% if g.user.rol == 'Administrador' %}
+  <a href="{{ url_for('usuarios') }}" class="{{ 'active' if request.endpoint in ['usuarios','usuario_nuevo','usuario_estado'] else '' }}">♙ <span>Usuarios</span></a>
   <a href="{{ url_for('prueba') }}" class="{{ 'active' if request.endpoint=='prueba' else '' }}">★ <span>Prueba y planes</span></a>
+  {% endif %}
   <div class="sidebar-note"><b>Ayuda rápida</b><p>Usa los botones grandes y completa solo los datos solicitados. Si tienes dudas, vuelve al Inicio.</p></div>
 </nav>
 <main class="content">
