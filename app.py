@@ -1,11 +1,29 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, abort
+from flask import Flask, render_template, request, redirect, url_for, flash, abort, session, g
 import sqlite3
 import os
+import secrets
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_wtf.csrf import CSRFProtect
 from pathlib import Path
 from datetime import date, timedelta
 
 app = Flask(__name__)
-app.secret_key = "sigam-demo-local"
+# La clave se conserva entre reinicios. En despliegues administrados debe definirse SIGAM_SECRET_KEY.
+secret_file = Path(__file__).with_name(".sigam_secret_key")
+app.secret_key = os.environ.get("SIGAM_SECRET_KEY")
+if not app.secret_key:
+    if secret_file.exists():
+        app.secret_key = secret_file.read_text(encoding="utf-8").strip()
+    else:
+        app.secret_key = secrets.token_hex(32)
+        secret_file.write_text(app.secret_key, encoding="utf-8")
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.environ.get("SIGAM_HTTPS", "0") == "1",
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
+)
+csrf = CSRFProtect(app)
 DB = Path(__file__).with_name("sigam.db")
 
 def connect():
@@ -24,6 +42,15 @@ def init_db():
     with connect() as con:
         con.execute("PRAGMA journal_mode = WAL")
         con.executescript("""
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            nombre TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            rol TEXT NOT NULL CHECK(rol IN ('Administrador','Supervisor','Trabajador')),
+            activo INTEGER NOT NULL DEFAULT 1,
+            creado_en TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
         CREATE TABLE IF NOT EXISTS activos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             codigo TEXT NOT NULL UNIQUE,
@@ -73,6 +100,179 @@ def init_db():
             fecha TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
         """)
+
+# Inicializa las tablas también al ejecutar con un servidor WSGI (por ejemplo Gunicorn).
+init_db()
+
+ROLES = ("Administrador", "Supervisor", "Trabajador")
+
+
+def user_count():
+    with connect() as con:
+        return con.execute("SELECT COUNT(*) FROM usuarios").fetchone()[0]
+
+
+@app.before_request
+def load_user_and_enforce_access():
+    g.user = None
+    uid = session.get("user_id")
+    if uid:
+        with connect() as con:
+            g.user = con.execute("SELECT id, username, nombre, rol, activo FROM usuarios WHERE id=?", (uid,)).fetchone()
+        if not g.user or not g.user["activo"]:
+            session.clear()
+            g.user = None
+
+    endpoint = request.endpoint or ""
+    if endpoint == "static":
+        return
+    if user_count() == 0:
+        if endpoint != "setup":
+            return redirect(url_for("setup"))
+        return
+    if endpoint == "setup":
+        return redirect(url_for("login"))
+    if endpoint in ("login",):
+        return
+    if endpoint == "logout":
+        if not g.user:
+            return redirect(url_for("login"))
+        return
+    if not g.user:
+        return redirect(url_for("login", next=request.path))
+
+    role = g.user["rol"]
+    admin_only = {"usuarios", "usuario_nuevo", "usuario_estado", "usuario_actualizar", "prueba"}
+    supervisor_or_admin = {"activo_form", "desactivar_activo", "crear_orden"}
+    if endpoint == "orden_detalle" and request.method == "POST":
+        supervisor_or_admin.add(endpoint)
+    if endpoint in admin_only and role != "Administrador":
+        abort(403)
+    if endpoint in supervisor_or_admin and role not in ("Administrador", "Supervisor"):
+        abort(403)
+
+
+@app.route("/configurar", methods=["GET", "POST"])
+def setup():
+    if user_count() > 0:
+        return redirect(url_for("login"))
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        nombre = request.form.get("nombre", "").strip()
+        password = request.form.get("password", "")
+        confirm = request.form.get("confirm", "")
+        if not username or not nombre or len(password) < 10:
+            flash("Completa los datos. La contraseña debe tener al menos 10 caracteres.", "error")
+        elif password != confirm:
+            flash("Las contraseñas no coinciden.", "error")
+        else:
+            with connect() as con:
+                con.execute("INSERT INTO usuarios(username,nombre,password_hash,rol) VALUES(?,?,?,'Administrador')",
+                            (username, nombre, generate_password_hash(password)))
+                uid = con.execute("SELECT id FROM usuarios WHERE username=?", (username,)).fetchone()[0]
+            session.clear()
+            session.permanent = True
+            session["user_id"] = uid
+            flash("Cuenta de administrador creada. Ya puedes comenzar a utilizar SIGAM.", "success")
+            return redirect(url_for("index"))
+    return render_template("setup.html")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        with connect() as con:
+            user = con.execute("SELECT * FROM usuarios WHERE username=? COLLATE NOCASE AND activo=1", (username,)).fetchone()
+        if user and check_password_hash(user["password_hash"], password):
+            session.clear()
+            session.permanent = True
+            session["user_id"] = user["id"]
+            next_url = request.args.get("next", "")
+            if not next_url.startswith("/") or next_url.startswith("//"):
+                next_url = url_for("index")
+            return redirect(next_url)
+        flash("Usuario o contraseña incorrectos, o cuenta desactivada.", "error")
+    return render_template("login.html")
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    flash("Sesión cerrada correctamente.", "success")
+    return redirect(url_for("login"))
+
+
+@app.route("/usuarios", methods=["GET", "POST"])
+def usuarios():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        nombre = request.form.get("nombre", "").strip()
+        password = request.form.get("password", "")
+        rol = request.form.get("rol", "")
+        if not username or not nombre or rol not in ROLES or len(password) < 10:
+            flash("Completa los datos y utiliza una contraseña de al menos 10 caracteres.", "error")
+        else:
+            try:
+                with connect() as con:
+                    con.execute("INSERT INTO usuarios(username,nombre,password_hash,rol) VALUES(?,?,?,?)",
+                                (username, nombre, generate_password_hash(password), rol))
+                flash("Usuario creado correctamente.", "success")
+                return redirect(url_for("usuarios"))
+            except sqlite3.IntegrityError:
+                flash("Ese nombre de usuario ya existe.", "error")
+    with connect() as con:
+        rows = con.execute("SELECT id,username,nombre,rol,activo,creado_en FROM usuarios ORDER BY nombre").fetchall()
+    return render_template("usuarios.html", usuarios=rows, roles=ROLES)
+
+
+@app.route("/usuarios/<int:uid>/actualizar", methods=["POST"])
+def usuario_actualizar(uid):
+    rol = request.form.get("rol", "")
+    password = request.form.get("password", "")
+    if rol not in ROLES:
+        abort(400)
+    with connect() as con:
+        target = con.execute("SELECT id,rol,activo FROM usuarios WHERE id=?", (uid,)).fetchone()
+        if not target:
+            abort(404)
+        if target["rol"] == "Administrador" and target["activo"] and rol != "Administrador":
+            admins = con.execute("SELECT COUNT(*) FROM usuarios WHERE rol='Administrador' AND activo=1").fetchone()[0]
+            if admins <= 1:
+                flash("Debe existir al menos un administrador activo.", "error")
+                return redirect(url_for("usuarios"))
+        if password and len(password) < 10:
+            flash("La nueva contraseña debe tener al menos 10 caracteres.", "error")
+            return redirect(url_for("usuarios"))
+        if password:
+            con.execute("UPDATE usuarios SET rol=?, password_hash=? WHERE id=?",
+                        (rol, generate_password_hash(password), uid))
+        else:
+            con.execute("UPDATE usuarios SET rol=? WHERE id=?", (rol, uid))
+    flash("Permisos y cuenta actualizados.", "success")
+    return redirect(url_for("usuarios"))
+
+
+@app.route("/usuarios/<int:uid>/estado", methods=["POST"])
+def usuario_estado(uid):
+    activo = 1 if request.form.get("activo") == "1" else 0
+    if uid == g.user["id"] and not activo:
+        flash("No puedes desactivar tu propia cuenta.", "error")
+        return redirect(url_for("usuarios"))
+    with connect() as con:
+        target = con.execute("SELECT id,rol,activo FROM usuarios WHERE id=?", (uid,)).fetchone()
+        if not target:
+            abort(404)
+        if target["rol"] == "Administrador" and target["activo"] and not activo:
+            admins = con.execute("SELECT COUNT(*) FROM usuarios WHERE rol='Administrador' AND activo=1").fetchone()[0]
+            if admins <= 1:
+                flash("Debe existir al menos un administrador activo.", "error")
+                return redirect(url_for("usuarios"))
+        con.execute("UPDATE usuarios SET activo=? WHERE id=?", (activo, uid))
+    flash("Estado del usuario actualizado.", "success")
+    return redirect(url_for("usuarios"))
+
 
 @app.route("/")
 def index():

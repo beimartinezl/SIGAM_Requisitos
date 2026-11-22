@@ -43,11 +43,13 @@ for /f "delims=" %%I in ('"%PYTHON%" MOSTRAR_IP.py') do set "SIGAM_IP=%%I"
 if not defined SIGAM_IP set "SIGAM_IP=Consulta la IP con ipconfig"
 echo.
 echo En este computador: http://127.0.0.1:5000
+echo Primera ejecucion: crea el administrador en /configurar
 echo En la red local:     http://%SIGAM_IP%:5000
 echo.
 echo Los celulares y computadores deben estar conectados a la misma red.
 echo Si Windows pregunta por el Firewall, permite el acceso en redes privadas.
 echo No permitas el acceso en redes publicas y no publiques SIGAM en Internet.
+echo Cada trabajador debe tener una cuenta creada por el administrador.
 echo.
 echo Para detener el servidor, vuelve aqui y presiona Ctrl + C.
 echo ================================================

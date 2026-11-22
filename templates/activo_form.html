@@ -1,6 +1,6 @@
 {% extends "base.html" %}{% block title %}{{ 'Editar' if activo else 'Nuevo' }} activo | SIGAM{% endblock %}{% block content %}
 <div class="page-head"><div><div class="eyebrow">CATÁLOGO DE ACTIVOS</div><h1>{{ 'Editar equipo' if activo else 'Registrar equipo' }}</h1><p class="muted">Los campos marcados con * son obligatorios.</p></div><a class="btn secondary" href="{{ url_for('activos') }}">← Volver</a></div>
-<form method="post" class="panel form-panel"><div class="form-grid">
+<form method="post" class="panel form-panel"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><div class="form-grid">
 <label>Código del equipo *<input name="codigo" required value="{{ activo.codigo if activo else '' }}" placeholder="Ej. EXT-001"></label>
 <label>Nombre del equipo *<input name="nombre" required value="{{ activo.nombre if activo else '' }}" placeholder="Ej. Extrusora principal"></label>
 <label>Categoría<input name="categoria" value="{{ activo.categoria if activo else '' }}" placeholder="Ej. Producción"></label>

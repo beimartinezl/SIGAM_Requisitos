@@ -1,0 +1,4 @@
+{% extends "base_auth.html" %}{% block title %}Iniciar sesión | SIGAM{% endblock %}{% block content %}
+<h1>Iniciar sesión</h1><p class="muted">Ingresa con tu cuenta de SIGAM.</p>
+<form method="post" class="panel form-panel"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label>Nombre de usuario<input name="username" required autocomplete="username"></label><label>Contraseña<input type="password" name="password" required autocomplete="current-password"></label><button class="btn primary block">Ingresar</button></form>
+{% endblock %}
