@@ -1,79 +1,61 @@
-# SIGAM — MVP web responsivo
+# SIGAM — MVP académico con acceso por red local
 
-Aplicación local de gestión de activos y mantenimiento, construida con Flask y SQLite.
+Aplicación web responsiva para gestión básica de activos y mantenimiento. Utiliza Python, Flask y SQLite. En esta versión, un computador actúa como servidor y mantiene la única base de datos; los demás dispositivos acceden mediante un navegador a través de la red local (LAN/Wi-Fi).
 
-## Inicio rápido en Windows
+## Requisitos
 
-1. Instala **Python 3.10 o superior** desde https://www.python.org/downloads/ . Durante la instalación, marca **Add Python to PATH**.
-2. Descomprime la carpeta `SIGAM` en tu computador.
-3. Abre la carpeta y haz doble clic en `INICIAR_SIGAM.bat`.
-4. La primera vez, el archivo prepara un entorno propio e instala Flask. Para este paso se necesita conexión a Internet.
-5. Cuando la ventana indique que el servidor está activo, abre tu navegador y visita **http://127.0.0.1:5000**.
-6. Para cerrar SIGAM, vuelve a la ventana negra y presiona **Ctrl + C**.
+- Windows 10/11 para el inicio automático incluido.
+- Python 3.10 o superior instalado en el computador servidor.
+- Conexión a Internet solo durante la primera instalación de Flask y sus dependencias.
+- Los equipos cliente deben estar conectados a la misma red local que el servidor.
 
-La base de datos `sigam.db` se crea automáticamente en la carpeta de la aplicación al iniciar por primera vez. No elimines ese archivo si deseas conservar los registros.
+## Inicio en Windows
 
-## Inicio manual (Windows, macOS y Linux)
+1. Instala Python 3.10 o superior desde https://www.python.org/downloads/ y marca **Add Python to PATH**.
+2. Descomprime la carpeta `SIGAM` en el computador que actuará como servidor.
+3. Haz doble clic en `INICIAR_SIGAM.bat`.
+4. La primera vez se crea el entorno virtual e instalan las dependencias; se necesita Internet.
+5. La ventana muestra dos direcciones: `http://127.0.0.1:5000` para el propio servidor y `http://IP-LOCAL:5000` para los demás dispositivos.
+6. En los celulares, notebooks y computadores cliente abre la dirección de red local indicada. Todos deben usar la misma Wi-Fi/LAN.
+7. Si Windows Firewall pregunta, permite Python en **redes privadas**. No habilites redes públicas.
+8. Para cerrar SIGAM, vuelve a la ventana del servidor y presiona **Ctrl + C**.
 
-Se requiere Python 3.10 o superior.
+El computador servidor debe permanecer encendido y conectado a la red mientras los demás usuarios utilicen SIGAM. Si cambia su dirección IP, usa la nueva dirección que muestra el archivo de inicio.
 
-1. Abre una terminal dentro de la carpeta `SIGAM`.
-2. Crea un entorno virtual:
+## Base de datos compartida
 
-   **Windows**
-   ```bash
-   py -3 -m venv .venv
-   .venv\\Scripts\\activate
-   ```
+La base `sigam.db` se crea automáticamente en la carpeta de la aplicación del computador servidor. Todos los dispositivos acceden a los datos a través de Flask; no deben abrir, copiar ni sincronizar el archivo SQLite directamente. **No coloques `sigam.db` en una carpeta de red compartida**: debe permanecer en el disco local del servidor. Realiza copias de seguridad manuales periódicas cerrando SIGAM y copiando el archivo de base de datos.
 
-   **macOS / Linux**
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   ```
+SQLite está configurado con claves foráneas, espera breve ante escrituras simultáneas y modo WAL para mejorar la convivencia entre lecturas y escrituras. Esto es adecuado para una demostración académica de alcance pequeño, no constituye una garantía de rendimiento para una planta productiva ni para decenas de usuarios concurrentes.
 
-3. Instala Flask:
-   ```bash
-   python -m pip install -r requirements.txt
-   ```
-4. Inicia la aplicación:
-   ```bash
-   python app.py
-   ```
-5. Abre http://127.0.0.1:5000 en tu navegador.
+## Uso desde dispositivos cliente
 
-## Uso desde el teléfono en la misma red Wi-Fi
+1. Conecta el dispositivo a la misma red Wi-Fi/LAN.
+2. Abre Chrome, Edge, Firefox o Safari.
+3. Escribe `http://IP-LOCAL-DEL-SERVIDOR:5000`, reemplazando el texto por la IP que muestra la ventana del servidor.
+4. Registra o consulta activos, avisos, órdenes e intervenciones. Los cambios se guardan en la base central y quedan disponibles para los demás al actualizar o volver a consultar la página.
 
-Esta versión está configurada por defecto para uso local en el mismo computador. Para una demostración en una red local, cambia en `app.py`:
+## Si no puedes conectarte
 
-```python
-app.run(host="127.0.0.1", port=5000, debug=True)
-```
+- Confirma que el servidor está encendido y que la ventana de SIGAM sigue abierta.
+- Verifica que ambos dispositivos estén conectados a la misma red local y no a una red de invitados aislada.
+- Revisa la IP mostrada en la ventana; puedes ejecutar `ipconfig` en Windows y buscar la dirección IPv4 del adaptador conectado.
+- Comprueba que el Firewall de Windows permita Python en redes privadas.
+- Asegúrate de escribir `http://` y el puerto `:5000`.
 
-por:
+## Alcance académico y seguridad
 
-```python
-app.run(host="0.0.0.0", port=5000, debug=True)
-```
+Esta versión implementa acceso compartido en red local con una base de datos centralizada. **No implementa modo offline, sincronización posterior entre bases independientes, autenticación, cuentas individuales ni permisos por rol.** Los usuarios de la red autorizada pueden acceder a las funciones disponibles. Por ello, úsala solo en una red privada y de confianza, con datos de demostración; no la expongas directamente a Internet ni la consideres lista para producción. Para una operación real se necesitarán autenticación, autorización, HTTPS, respaldos automatizados, auditoría y un servidor de despliegue apropiado.
 
-Luego, desde el teléfono conectado a la misma Wi-Fi, ingresa a `http://IP-LOCAL-DEL-COMPUTADOR:5000`. La IP se consulta en la configuración de red del computador. No expongas esta versión de desarrollo a Internet.
+## Funciones del MVP
 
-## Apartado de prueba y suscripción
+- Registro, búsqueda, edición y desactivación de activos.
+- Registro y consulta de avisos de falla.
+- Creación y seguimiento básico de órdenes de trabajo.
+- Registro de intervenciones e historial por activo.
+- Panel principal con indicadores básicos.
+- Apartado demostrativo de prueba y planes; no procesa pagos ni contrata servicios reales.
 
-En el menú **Prueba y planes** puedes iniciar una prueba gratuita demostrativa de 14 días, seleccionar un plan referencial y registrar pruebas de usabilidad. Los planes propuestos son Básico ($19.990 CLP/mes) y Pyme ($39.990 CLP/mes). La selección se almacena localmente; no se realizan cobros, no existe pasarela de pago ni control real de licencias. Los precios son una hipótesis académica y deben validarse.
+## Prueba de usabilidad
 
-## Flujo recomendado de prueba
-
-1. Crea un activo desde **Activos**.
-2. Registra una falla desde **Avisos**.
-3. En la lista de avisos, crea una orden de trabajo.
-4. Cambia su estado y registra una intervención con responsable y fecha.
-5. Abre la ficha del activo o **Historial** para consultar la trazabilidad.
-
-## Usabilidad
-
-La interfaz incorpora etiquetas más cotidianas, instrucciones breves, botones táctiles amplios y un apartado para registrar pruebas de usabilidad. El objetivo tomado del informe es completar un aviso simple desde móvil en un máximo de 2 minutos.
-
-## Alcance y limitaciones
-
-Es un MVP académico local. No incluye autenticación, roles, operación multiusuario, sincronización, copias de seguridad automáticas, inventario, adjuntos, QR ni mantenimiento preventivo automático. No debe utilizarse como sistema productivo sin implementar controles de seguridad, respaldos y despliegue apropiado.
+El objetivo académico es que una persona pueda registrar un aviso sencillo desde un celular en un máximo de 2 minutos. Este objetivo debe validarse con personas reales; el diseño por sí solo no demuestra que se cumpla.
