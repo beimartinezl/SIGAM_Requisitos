@@ -56,11 +56,6 @@ Esta versión implementa acceso compartido en red local con una base de datos ce
 - Panel principal con indicadores básicos.
 - Apartado demostrativo de prueba y planes; no procesa pagos ni contrata servicios reales.
 
-## Prueba de usabilidad
-
-El objetivo académico es que una persona pueda registrar un aviso sencillo desde un celular en un máximo de 2 minutos. Este objetivo debe validarse con personas reales; el diseño por sí solo no demuestra que se cumpla.
-
-
 ## Cuentas y niveles de acceso (v4.2)
 
 Al iniciar SIGAM por primera vez, abre `http://127.0.0.1:5000/configurar` y crea la primera cuenta de Administrador. No existe una contraseña predeterminada. Después, cada usuario inicia sesión con su nombre de usuario y contraseña.
