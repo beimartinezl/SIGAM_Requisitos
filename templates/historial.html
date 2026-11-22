@@ -1,0 +1,5 @@
+{% extends "base.html" %}{% block title %}Historial | SIGAM{% endblock %}{% block content %}
+<div class="page-head"><div><div class="eyebrow">TRAZABILIDAD</div><h1>Historial por activo</h1><p class="muted">Busca un equipo para revisar sus avisos y órdenes relacionadas.</p></div></div>
+<form class="searchbar"><input name="q" value="{{ q }}" placeholder="Buscar por código, nombre o ubicación"><button class="btn secondary">Buscar</button></form>
+<div class="panel table-panel">{% if activos %}<div class="table-wrap"><table><thead><tr><th>Código</th><th>Activo</th><th>Ubicación</th><th>Avisos registrados</th><th></th></tr></thead><tbody>{% for a in activos %}<tr><td><b>{{ a.codigo }}</b></td><td>{{ a.nombre }}</td><td>{{ a.ubicacion }}</td><td>{{ a.total }}</td><td><a class="table-link" href="{{ url_for('activo_detalle',aid=a.id) }}">Ver historial →</a></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty"><b>No hay activos para mostrar</b><p>Registra activos para construir su historial de mantenimiento.</p></div>{% endif %}</div>
+{% endblock %}

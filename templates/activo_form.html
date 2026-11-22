@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% block title %}{{ 'Editar' if activo else 'Nuevo' }} activo | SIGAM{% endblock %}{% block content %}
+<div class="page-head"><div><div class="eyebrow">CATÁLOGO DE ACTIVOS</div><h1>{{ 'Editar activo' if activo else 'Registrar activo' }}</h1><p class="muted">Los campos marcados con * son obligatorios.</p></div><a class="btn secondary" href="{{ url_for('activos') }}">← Volver</a></div>
+<form method="post" class="panel form-panel"><div class="form-grid">
+<label>Código identificador *<input name="codigo" required value="{{ activo.codigo if activo else '' }}" placeholder="Ej. EXT-001"></label>
+<label>Nombre del activo *<input name="nombre" required value="{{ activo.nombre if activo else '' }}" placeholder="Ej. Extrusora principal"></label>
+<label>Categoría<input name="categoria" value="{{ activo.categoria if activo else '' }}" placeholder="Ej. Producción"></label>
+<label>Ubicación *<input name="ubicacion" required value="{{ activo.ubicacion if activo else '' }}" placeholder="Ej. Planta 1 - Línea A"></label>
+{% if activo %}<label>Estado<select name="estado"><option {{ 'selected' if activo.estado=='Activo' else '' }}>Activo</option><option {{ 'selected' if activo.estado=='Inactivo' else '' }}>Inactivo</option></select></label>{% endif %}
+</div><div class="form-actions"><a class="btn secondary" href="{{ url_for('activos') }}">Cancelar</a><button class="btn primary">Guardar activo</button></div></form>
+{% endblock %}

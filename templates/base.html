@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#102b46">
+<title>{% block title %}SIGAM{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">S</span><span>SIGAM<small>Gestión de activos y mantenimiento</small></span></a>
+  <span class="local-tag">MVP LOCAL</span>
+</header>
+<div class="layout">
+<nav class="sidebar">
+  <div class="nav-label">MENÚ PRINCIPAL</div>
+  <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint=='index' else '' }}">▦ <span>Inicio</span></a>
+  <a href="{{ url_for('activos') }}" class="{{ 'active' if request.endpoint in ['activos','activo_form','activo_detalle'] else '' }}">▣ <span>Activos</span></a>
+  <a href="{{ url_for('avisos') }}" class="{{ 'active' if request.endpoint in ['avisos','aviso_nuevo'] else '' }}">⚑ <span>Avisos</span></a>
+  <a href="{{ url_for('ordenes') }}" class="{{ 'active' if request.endpoint in ['ordenes','orden_detalle'] else '' }}">☷ <span>Órdenes de trabajo</span></a>
+  <a href="{{ url_for('historial') }}" class="{{ 'active' if request.endpoint=='historial' else '' }}">◷ <span>Historial</span></a>
+  <div class="sidebar-note"><b>Versión académica</b><p>Los datos se guardan localmente en SQLite en este equipo.</p></div>
+</nav>
+<main class="content">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}{% for category,message in messages %}<div class="flash {{ category }}">{{ message }}</div>{% endfor %}{% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+  <footer>SIGAM · Sistema Integral de Gestión de Activos y Mantenimiento</footer>
+</main>
+</div>
+</body></html>
