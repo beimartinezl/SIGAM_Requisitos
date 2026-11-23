@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% block title %}Indicadores y reportes | SIGAM{% endblock %}{% block content %}
+<div class="page-head"><div><div class="eyebrow">SEGUIMIENTO</div><h1>Indicadores y reportes</h1><p class="muted">Revisa avisos y órdenes de trabajo; exporta el detalle a Excel (CSV).</p></div></div>
+<div class="panel form-panel"><form method="get" action="{{ url_for('reportes') }}"><div class="form-grid"><label>Desde (fecha de aviso)<input type="date" name="desde" value="{{ desde }}"></label><label>Hasta (fecha de aviso)<input type="date" name="hasta" value="{{ hasta }}"></label></div><div class="form-actions"><button class="btn primary">Aplicar filtro</button><a class="btn secondary" href="{{ url_for('reportes') }}">Limpiar</a><a class="btn secondary" href="{{ url_for('exportar_reporte',desde=desde,hasta=hasta) }}">Descargar CSV</a></div></form></div>
+<div class="report-kpis">
+<div class="panel kpi"><div class="muted">Activos operativos</div><strong>{{ datos.activos }}</strong><small>Total actual</small></div>
+<div class="panel kpi"><div class="muted">Avisos</div><strong>{{ datos.total_avisos }}</strong><small>Según fechas del filtro</small></div>
+<div class="panel kpi"><div class="muted">Órdenes generadas</div><strong>{{ datos.total_ordenes }}</strong><small>De los avisos filtrados</small></div>
+<div class="panel kpi"><div class="muted">Órdenes finalizadas</div><strong>{{ datos.finalizadas }}</strong><small>De los avisos filtrados</small></div>
+<div class="panel kpi"><div class="muted">Preventivos vencidos</div><strong>{{ datos.preventivos_vencidos }}</strong><small>Total actual</small></div>
+<div class="panel kpi"><div class="muted">Repuestos en mínimo</div><strong>{{ datos.repuestos_bajos }}</strong><small>Total actual</small></div>
+</div>
+<div class="panel form-panel"><h2>Estado de las órdenes</h2><div class="report-kpis"><div><b>Pendientes:</b> {{ datos.pendientes }}</div><div><b>En progreso:</b> {{ datos.en_progreso }}</div><div><b>Finalizadas:</b> {{ datos.finalizadas }}</div></div><h3>Prioridad de avisos</h3><div class="report-kpis"><div><b>Alta:</b> {{ datos.prioridades.get('Alta',0) }}</div><div><b>Media:</b> {{ datos.prioridades.get('Media',0) }}</div><div><b>Baja:</b> {{ datos.prioridades.get('Baja',0) }}</div></div></div>
+<div class="section-head"><h2>Detalle de avisos</h2></div>
+<div class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Equipo</th><th>Descripción</th><th>Prioridad</th><th>Orden</th></tr></thead><tbody>
+{% for a in datos.avisos %}<tr><td>{{ a.fecha }}</td><td>{{ a.codigo }} · {{ a.nombre }}</td><td>{{ a.descripcion }}</td><td>{{ a.prioridad }}</td><td>{% if a.orden_id %}<a href="{{ url_for('orden_detalle',oid=a.orden_id) }}">OT-{{ a.orden_id }}</a> ({{ a.orden_estado }}){% else %}Sin orden{% endif %}</td></tr>{% else %}<tr><td colspan="5">No hay avisos para el período seleccionado.</td></tr>{% endfor %}
+</tbody></table></div></div>
+<p class="muted">Nota: los indicadores de preventivos vencidos, repuestos bajos y activos muestran el estado actual y no cambian con el filtro de fechas.</p>
+{% endblock %}

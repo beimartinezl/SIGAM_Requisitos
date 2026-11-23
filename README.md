@@ -146,3 +146,7 @@ Ejecuta `EJECUTAR_PRUEBAS.bat` en Windows. Incluye las pruebas de importación E
 5. Ejecuta `EJECUTAR_PRUEBAS.bat` para validar. Las pruebas utilizan bases de datos temporales.
 
 Para empezar una base desde cero puedes usar `REINICIAR_BASE_DATOS.bat`, que guarda un respaldo previo. **No es necesario ni recomendable reiniciar la base para actualizar.**
+
+
+## v4.7 - Indicadores y reportes
+La sección **Indicadores y reportes** está disponible para Administrador y Supervisor. Permite filtrar avisos y órdenes por fecha del aviso (ambos extremos incluidos) y exportar CSV con punto y coma, UTF-8 y protección básica contra fórmulas de Excel. Activos, stock bajo y preventivos vencidos son indicadores actuales, sin filtro histórico. Los datos siguen en SQLite y se preservan al actualizar.

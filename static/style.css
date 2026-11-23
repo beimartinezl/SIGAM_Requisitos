@@ -11,3 +11,9 @@
 .user-area{display:flex;align-items:center;gap:14px}.user-area form{margin:0}.user-chip{font-size:11px;color:#dce8f2}.logout-btn{background:transparent;border:1px solid #71879a;border-radius:6px;color:#fff;padding:7px 10px;font:600 11px 'DM Sans';cursor:pointer}.auth-content{max-width:480px;margin:8vh auto;padding:20px}.auth-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:28px;box-shadow:0 5px 24px #1c344510}.auth-card h1{margin-bottom:8px}.auth-card form{display:grid;gap:16px;margin-top:20px}.auth-card .block{width:100%}.auth-card label input{margin-top:7px}@media(max-width:620px){.user-area{gap:6px}.user-chip{font-size:9px;max-width:130px}.logout-btn{padding:6px;font-size:10px}.auth-content{margin:3vh auto;padding:14px}.auth-card{padding:20px}}
 
 .user-edit-form{display:grid;gap:5px;min-width:180px}.user-edit-form input,.user-edit-form select{padding:7px;font-size:11px}
+
+/* v4.7: tarjetas de reporte adaptables */
+.report-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:14px 0 20px}
+.report-kpis .kpi{padding:20px;display:flex;flex-direction:column;gap:7px}
+.report-kpis .kpi strong{font-size:2rem;line-height:1.15;color:var(--primary,#173b57)}
+.report-kpis .kpi small{color:#64748b}
