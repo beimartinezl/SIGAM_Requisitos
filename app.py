@@ -120,6 +120,47 @@ def init_db():
         );
         CREATE INDEX IF NOT EXISTS idx_movimientos_orden ON movimientos_repuestos(orden_id);
         CREATE INDEX IF NOT EXISTS idx_movimientos_repuesto ON movimientos_repuestos(repuesto_id);
+        CREATE TABLE IF NOT EXISTS planes_preventivos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            activo_id INTEGER NOT NULL REFERENCES activos(id),
+            titulo TEXT NOT NULL,
+            instrucciones TEXT NOT NULL DEFAULT '',
+            frecuencia_dias INTEGER NOT NULL CHECK(frecuencia_dias BETWEEN 1 AND 3650),
+            proxima_fecha TEXT NOT NULL,
+            activo INTEGER NOT NULL DEFAULT 1 CHECK(activo IN (0,1)),
+            creado_por INTEGER REFERENCES usuarios(id),
+            creado_en TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_preventivos_fecha ON planes_preventivos(activo,proxima_fecha);
+        CREATE TABLE IF NOT EXISTS tareas_preventivas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            plan_id INTEGER NOT NULL REFERENCES planes_preventivos(id),
+            descripcion TEXT NOT NULL,
+            orden INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS ejecuciones_preventivas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            plan_id INTEGER NOT NULL REFERENCES planes_preventivos(id),
+            responsable_id INTEGER REFERENCES usuarios(id),
+            fecha TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            observaciones TEXT NOT NULL DEFAULT '',
+            fecha_anterior TEXT NOT NULL,
+            fecha_siguiente TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS resultados_preventivos (
+            ejecucion_id INTEGER NOT NULL REFERENCES ejecuciones_preventivas(id),
+            tarea_id INTEGER NOT NULL REFERENCES tareas_preventivas(id),
+            PRIMARY KEY (ejecucion_id,tarea_id)
+        );
+        CREATE TABLE IF NOT EXISTS entregas_turno (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha TEXT NOT NULL,
+            turno TEXT NOT NULL CHECK(turno IN ('Mañana','Tarde','Noche')),
+            resumen TEXT NOT NULL,
+            pendientes TEXT NOT NULL DEFAULT '',
+            autor_id INTEGER REFERENCES usuarios(id),
+            creado_en TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
         CREATE TABLE IF NOT EXISTS suscripcion (
             id INTEGER PRIMARY KEY CHECK (id = 1),
             plan TEXT NOT NULL,
@@ -198,7 +239,7 @@ def load_user_and_enforce_access():
 
     role = g.user["rol"]
     admin_only = {"usuarios", "usuario_nuevo", "usuario_estado", "usuario_actualizar", "prueba"}
-    supervisor_or_admin = {"activo_form", "desactivar_activo", "crear_orden", "importar_activos", "asignar_orden", "prueba_retorno", "repuesto_nuevo", "repuesto_entrada"}
+    supervisor_or_admin = {"activo_form", "desactivar_activo", "crear_orden", "importar_activos", "asignar_orden", "prueba_retorno", "repuesto_nuevo", "repuesto_entrada", "preventivo_nuevo", "preventivo_estado"}
     if endpoint == "orden_detalle" and request.method == "POST":
         supervisor_or_admin.add(endpoint)
     if endpoint in admin_only and role != "Administrador":
@@ -724,6 +765,138 @@ def consumir_repuesto(oid):
             VALUES(?,?,'Consumo',?,?,?)""", (rid,oid,cantidad,g.user["id"],observacion))
     flash("Consumo de repuesto registrado en la orden.", "success")
     return redirect(url_for("orden_detalle", oid=oid))
+
+
+@app.route("/preventivos")
+def preventivos():
+    filtro = request.args.get("filtro", "Todos")
+    if filtro not in ("Todos", "Pendientes", "Programados", "Pausados"):
+        filtro = "Todos"
+    hoy = date.today().isoformat()
+    with connect() as con:
+        planes = con.execute("""SELECT p.*, a.codigo, a.nombre AS activo_nombre,
+            (SELECT COUNT(*) FROM ejecuciones_preventivas e WHERE e.plan_id=p.id) AS ejecuciones
+            FROM planes_preventivos p JOIN activos a ON a.id=p.activo_id
+            ORDER BY p.activo DESC, p.proxima_fecha, p.id""").fetchall()
+        activos = con.execute("SELECT id,codigo,nombre FROM activos WHERE estado='Activo' ORDER BY codigo").fetchall()
+    if filtro == "Pendientes":
+        planes = [r for r in planes if r['activo'] and r['proxima_fecha'] <= hoy]
+    elif filtro == "Programados":
+        planes = [r for r in planes if r['activo'] and r['proxima_fecha'] > hoy]
+    elif filtro == "Pausados":
+        planes = [r for r in planes if not r['activo']]
+    return render_template("preventivos.html", planes=planes, activos=activos, filtro=filtro, hoy=hoy)
+
+
+@app.route("/preventivos/nuevo", methods=["POST"])
+def preventivo_nuevo():
+    try:
+        activo_id = int(request.form.get('activo_id', ''))
+        frecuencia = int(request.form.get('frecuencia_dias', ''))
+        proxima = date.fromisoformat(request.form.get('proxima_fecha', ''))
+    except (ValueError, TypeError):
+        flash('Selecciona un equipo, una frecuencia y una fecha válidos.', 'error')
+        return redirect(url_for('preventivos'))
+    titulo = request.form.get('titulo', '').strip()
+    instrucciones = request.form.get('instrucciones', '').strip()
+    tareas = [x.strip() for x in request.form.get('tareas', '').splitlines() if x.strip()]
+    if not titulo or not (1 <= frecuencia <= 3650) or not (1 <= len(tareas) <= 20) or any(len(t)>250 for t in tareas):
+        flash('Indica un título, una frecuencia de 1 a 3650 días y entre 1 y 20 tareas (máximo 250 caracteres cada una).', 'error')
+        return redirect(url_for('preventivos'))
+    with connect() as con:
+        if not con.execute("SELECT id FROM activos WHERE id=? AND estado='Activo'", (activo_id,)).fetchone():
+            flash('Selecciona un equipo activo.', 'error')
+            return redirect(url_for('preventivos'))
+        cur = con.execute("""INSERT INTO planes_preventivos
+            (activo_id,titulo,instrucciones,frecuencia_dias,proxima_fecha,creado_por)
+            VALUES (?,?,?,?,?,?)""", (activo_id,titulo,instrucciones,frecuencia,proxima.isoformat(),g.user['id']))
+        con.executemany("INSERT INTO tareas_preventivas(plan_id,descripcion,orden) VALUES (?,?,?)",
+                        [(cur.lastrowid,t,i) for i,t in enumerate(tareas,1)])
+    flash('Mantenimiento preventivo programado.', 'success')
+    return redirect(url_for('preventivo_detalle', pid=cur.lastrowid))
+
+
+@app.route("/preventivos/<int:pid>")
+def preventivo_detalle(pid):
+    with connect() as con:
+        plan = con.execute("""SELECT p.*,a.codigo,a.nombre AS activo_nombre FROM planes_preventivos p
+            JOIN activos a ON a.id=p.activo_id WHERE p.id=?""",(pid,)).fetchone()
+        if not plan: abort(404)
+        tareas = con.execute("SELECT * FROM tareas_preventivas WHERE plan_id=? ORDER BY orden",(pid,)).fetchall()
+        ejecuciones = con.execute("""SELECT e.*,u.nombre AS responsable_nombre,
+            (SELECT COUNT(*) FROM resultados_preventivos r WHERE r.ejecucion_id=e.id) AS marcadas
+            FROM ejecuciones_preventivas e LEFT JOIN usuarios u ON u.id=e.responsable_id
+            WHERE e.plan_id=? ORDER BY e.id DESC LIMIT 40""",(pid,)).fetchall()
+    return render_template('preventivo_detalle.html', plan=plan, tareas=tareas, ejecuciones=ejecuciones, hoy=date.today().isoformat())
+
+
+@app.route("/preventivos/<int:pid>/estado", methods=["POST"])
+def preventivo_estado(pid):
+    valor = request.form.get('activo')
+    if valor not in ('0','1'): abort(400)
+    with connect() as con:
+        if con.execute('UPDATE planes_preventivos SET activo=? WHERE id=?',(int(valor),pid)).rowcount == 0:
+            abort(404)
+    flash('Estado del plan actualizado.', 'success')
+    return redirect(url_for('preventivo_detalle',pid=pid))
+
+
+@app.route("/preventivos/<int:pid>/ejecutar", methods=["POST"])
+def preventivo_ejecutar(pid):
+    # Solo planes activos; checklist íntegro requerido para marcar ejecución completa.
+    with connect() as con:
+        plan = con.execute('SELECT * FROM planes_preventivos WHERE id=?',(pid,)).fetchone()
+        if not plan: abort(404)
+        if not plan['activo']:
+            flash('No se puede ejecutar un plan pausado.', 'error')
+            return redirect(url_for('preventivo_detalle',pid=pid))
+        tareas = con.execute('SELECT id FROM tareas_preventivas WHERE plan_id=?',(pid,)).fetchall()
+        ids = {str(t['id']) for t in tareas}
+        marcados = request.form.getlist('tarea_id')
+        if not ids or set(marcados) != ids or len(marcados) != len(ids):
+            flash('Debes completar todas las tareas antes de cerrar el mantenimiento.', 'error')
+            return redirect(url_for('preventivo_detalle',pid=pid))
+        observaciones = request.form.get('observaciones','').strip()
+        # Próxima ejecución desde hoy: evita acumular avisos vencidos tras una ejecución tardía.
+        anterior = plan['proxima_fecha']
+        siguiente = (date.today()+timedelta(days=plan['frecuencia_dias'])).isoformat()
+        # Evita dos cierres del mismo período si dos personas guardan simultáneamente.
+        actualizado = con.execute("""UPDATE planes_preventivos SET proxima_fecha=?
+            WHERE id=? AND activo=1 AND proxima_fecha=?""", (siguiente,pid,anterior))
+        if actualizado.rowcount != 1:
+            flash('El plan cambió mientras lo completabas; vuelve a revisar.', 'error')
+            return redirect(url_for('preventivo_detalle',pid=pid))
+        cur = con.execute("""INSERT INTO ejecuciones_preventivas
+            (plan_id,responsable_id,observaciones,fecha_anterior,fecha_siguiente)
+            VALUES (?,?,?,?,?)""",(pid,g.user['id'],observaciones,anterior,siguiente))
+        con.executemany('INSERT INTO resultados_preventivos(ejecucion_id,tarea_id) VALUES (?,?)',
+                        [(cur.lastrowid,int(i)) for i in ids])
+    flash('Checklist completado y próxima fecha actualizada.', 'success')
+    return redirect(url_for('preventivo_detalle',pid=pid))
+
+
+@app.route("/turnos", methods=["GET","POST"])
+def turnos():
+    if request.method == 'POST':
+        resumen = request.form.get('resumen','').strip()
+        pendientes = request.form.get('pendientes','').strip()
+        turno = request.form.get('turno','')
+        try:
+            fecha = date.fromisoformat(request.form.get('fecha',''))
+        except (ValueError, TypeError):
+            fecha = None
+        if not resumen or turno not in ('Mañana','Tarde','Noche') or not fecha:
+            flash('Completa fecha, turno y resumen.', 'error')
+        else:
+            with connect() as con:
+                con.execute('INSERT INTO entregas_turno(fecha,turno,resumen,pendientes,autor_id) VALUES (?,?,?,?,?)',
+                            (fecha.isoformat(),turno,resumen,pendientes,g.user['id']))
+            flash('Entrega de turno registrada.', 'success')
+        return redirect(url_for('turnos'))
+    with connect() as con:
+        entregas = con.execute("""SELECT t.*,u.nombre AS autor_nombre FROM entregas_turno t
+            LEFT JOIN usuarios u ON u.id=t.autor_id ORDER BY t.fecha DESC,t.id DESC LIMIT 100""").fetchall()
+    return render_template('turnos.html',entregas=entregas,hoy=date.today().isoformat())
 
 
 @app.route("/historial")

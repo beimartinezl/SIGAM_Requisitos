@@ -1,11 +1,5 @@
-SIGAM v4.5 — Gestión de repuestos e inventario
+SIGAM v4.6 — Mantenimiento preventivo y entregas de turno
 
-Se incorpora un módulo básico para registrar repuestos, consultar existencias,
-realizar entradas de stock y registrar consumos asociados a órdenes de trabajo.
-Incluye alertas de stock bajo, historial de movimientos, permisos por rol y
-validación para impedir consumos superiores al inventario disponible.
-Se conservan las funcionalidades anteriores y la base SQLite se actualiza sin
-eliminar información existente.
+Se añade la programación de mantenimientos periódicos por equipo, con fechas de vencimiento, checklist de tareas, historial de ejecuciones y recálculo de la próxima fecha. También se incorpora un registro de entregas de turno con pendientes y responsable.
 
-Validación: se agregan 11 pruebas nuevas de v4.5; ejecutarlas junto con las
-12 pruebas previas mediante EJECUTAR_PRUEBAS.bat.
+Incluye validaciones, permisos por rol y 12 pruebas nuevas. Mantiene las funciones de versiones anteriores y migra la base SQLite sin borrar datos.

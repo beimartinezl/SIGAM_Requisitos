@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 echo ==========================================
-echo     SIGAM v4.5 - PRUEBAS AUTOMATIZADAS
+echo     SIGAM v4.6 - PRUEBAS AUTOMATIZADAS
 echo ==========================================
 python --version
 if errorlevel 1 (echo ERROR: Python no esta instalado o no esta en PATH.& pause & exit /b 1)
