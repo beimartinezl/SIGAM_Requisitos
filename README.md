@@ -1,4 +1,4 @@
-# SIGAM — MVP con acceso por red local
+# SIGAM — MVP académico con acceso por red local
 
 Aplicación web responsiva para gestión básica de activos y mantenimiento. Utiliza Python, Flask y SQLite. En esta versión, un computador actúa como servidor y mantiene la única base de datos; los demás dispositivos acceden mediante un navegador a través de la red local (LAN/Wi-Fi).
 

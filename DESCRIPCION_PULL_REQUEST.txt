@@ -1,0 +1,3 @@
+SIGAM v4.3 – Panel gráfico de administración
+
+Se incorpora una interfaz de escritorio para iniciar y detener el servidor, abrir SIGAM en el navegador, consultar la dirección local y gestionar respaldos o reiniciar la base de datos con confirmaciones. Se conserva íntegramente el alcance funcional del Sprint 1 y se mantienen las pruebas de importación Excel.
