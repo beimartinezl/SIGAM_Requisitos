@@ -99,6 +99,27 @@ def init_db():
             fecha TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             observacion TEXT NOT NULL DEFAULT ''
         );
+        CREATE TABLE IF NOT EXISTS repuestos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            codigo TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            nombre TEXT NOT NULL,
+            unidad TEXT NOT NULL DEFAULT 'unidad',
+            stock INTEGER NOT NULL DEFAULT 0 CHECK(stock >= 0),
+            stock_minimo INTEGER NOT NULL DEFAULT 0 CHECK(stock_minimo >= 0),
+            creado_en TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS movimientos_repuestos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            repuesto_id INTEGER NOT NULL REFERENCES repuestos(id),
+            orden_id INTEGER REFERENCES ordenes_trabajo(id),
+            tipo TEXT NOT NULL CHECK(tipo IN ('Entrada','Consumo')),
+            cantidad INTEGER NOT NULL CHECK(cantidad > 0),
+            usuario_id INTEGER REFERENCES usuarios(id),
+            observacion TEXT NOT NULL DEFAULT '',
+            fecha TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_movimientos_orden ON movimientos_repuestos(orden_id);
+        CREATE INDEX IF NOT EXISTS idx_movimientos_repuesto ON movimientos_repuestos(repuesto_id);
         CREATE TABLE IF NOT EXISTS suscripcion (
             id INTEGER PRIMARY KEY CHECK (id = 1),
             plan TEXT NOT NULL,
@@ -177,7 +198,7 @@ def load_user_and_enforce_access():
 
     role = g.user["rol"]
     admin_only = {"usuarios", "usuario_nuevo", "usuario_estado", "usuario_actualizar", "prueba"}
-    supervisor_or_admin = {"activo_form", "desactivar_activo", "crear_orden", "importar_activos", "asignar_orden", "prueba_retorno"}
+    supervisor_or_admin = {"activo_form", "desactivar_activo", "crear_orden", "importar_activos", "asignar_orden", "prueba_retorno", "repuesto_nuevo", "repuesto_entrada"}
     if endpoint == "orden_detalle" and request.method == "POST":
         supervisor_or_admin.add(endpoint)
     if endpoint in admin_only and role != "Administrador":
@@ -573,11 +594,18 @@ def orden_detalle(oid):
             return redirect(url_for("orden_detalle", oid=oid))
         intervenciones = con.execute("SELECT * FROM intervenciones WHERE orden_id=? ORDER BY id DESC", (oid,)).fetchall()
         tecnicos = con.execute("SELECT id,nombre,rol FROM usuarios WHERE activo=1 AND rol IN ('Supervisor','Trabajador') ORDER BY nombre").fetchall()
+        repuestos_disponibles = con.execute("SELECT id,codigo,nombre,unidad,stock FROM repuestos ORDER BY nombre").fetchall()
+        consumos = con.execute("""SELECT m.*,r.codigo,r.nombre,r.unidad,u.nombre AS usuario_nombre
+            FROM movimientos_repuestos m JOIN repuestos r ON r.id=m.repuesto_id
+            LEFT JOIN usuarios u ON u.id=m.usuario_id WHERE m.orden_id=? AND m.tipo='Consumo'
+            ORDER BY m.id DESC""", (oid,)).fetchall()
         asignaciones = con.execute("""SELECT h.*, u.nombre AS usuario_nombre, a.nombre AS autor_nombre
             FROM historial_asignaciones h LEFT JOIN usuarios u ON u.id=h.usuario_id
             LEFT JOIN usuarios a ON a.id=h.asignado_por WHERE h.orden_id=? ORDER BY h.id DESC""", (oid,)).fetchall()
     return render_template("orden_detalle.html", orden=orden, intervenciones=intervenciones,
-                           tecnicos=tecnicos, asignaciones=asignaciones, hoy=date.today().isoformat())
+                           tecnicos=tecnicos, asignaciones=asignaciones,
+                           repuestos_disponibles=repuestos_disponibles, consumos=consumos,
+                           hoy=date.today().isoformat())
 
 @app.route("/ordenes/<int:oid>/intervencion", methods=["POST"])
 def intervencion_nueva(oid):
@@ -603,6 +631,100 @@ def intervencion_nueva(oid):
                 (oid,descripcion,fecha,responsable,hora_inicio,hora_fin,resultado))
             flash("Intervención registrada.", "success")
     return redirect(url_for("orden_detalle", oid=oid))
+
+@app.route("/repuestos")
+def repuestos():
+    q = request.args.get("q", "").strip()
+    with connect() as con:
+        rows = con.execute("""SELECT * FROM repuestos WHERE codigo LIKE ? OR nombre LIKE ?
+            ORDER BY nombre, codigo""", (f"%{q}%", f"%{q}%")).fetchall()
+    return render_template("repuestos.html", repuestos=rows, q=q)
+
+
+@app.route("/repuestos/nuevo", methods=["POST"])
+def repuesto_nuevo():
+    codigo = request.form.get("codigo", "").strip()
+    nombre = request.form.get("nombre", "").strip()
+    unidad = request.form.get("unidad", "unidad").strip()
+    try:
+        minimo = int(request.form.get("stock_minimo", "0"))
+    except ValueError:
+        minimo = -1
+    if not codigo or not nombre or not unidad or minimo < 0:
+        flash("Completa código, nombre, unidad y stock mínimo válido.", "error")
+        return redirect(url_for("repuestos"))
+    try:
+        with connect() as con:
+            con.execute("INSERT INTO repuestos(codigo,nombre,unidad,stock_minimo) VALUES(?,?,?,?)",
+                        (codigo,nombre,unidad,minimo))
+        flash("Repuesto incorporado. Registra una entrada para agregar existencias.", "success")
+    except sqlite3.IntegrityError:
+        flash("El código de repuesto ya existe.", "error")
+    return redirect(url_for("repuestos"))
+
+
+@app.route("/repuestos/<int:rid>/entrada", methods=["POST"])
+def repuesto_entrada(rid):
+    try:
+        cantidad = int(request.form.get("cantidad", ""))
+    except ValueError:
+        cantidad = 0
+    if cantidad <= 0:
+        flash("La cantidad de entrada debe ser un número entero positivo.", "error")
+        return redirect(url_for("repuestos"))
+    observacion = request.form.get("observacion", "").strip()
+    with connect() as con:
+        cur = con.execute("UPDATE repuestos SET stock=stock+? WHERE id=?", (cantidad,rid))
+        if cur.rowcount == 0:
+            abort(404)
+        con.execute("""INSERT INTO movimientos_repuestos(repuesto_id,tipo,cantidad,usuario_id,observacion)
+            VALUES(?,'Entrada',?,?,?)""", (rid,cantidad,g.user["id"],observacion))
+    flash("Entrada registrada. El stock ha sido actualizado.", "success")
+    return redirect(url_for("repuestos"))
+
+
+@app.route("/repuestos/movimientos")
+def movimientos_repuestos():
+    with connect() as con:
+        rows = con.execute("""SELECT m.*,r.codigo,r.nombre,u.nombre AS usuario_nombre
+            FROM movimientos_repuestos m JOIN repuestos r ON r.id=m.repuesto_id
+            LEFT JOIN usuarios u ON u.id=m.usuario_id ORDER BY m.id DESC LIMIT 300""").fetchall()
+    return render_template("movimientos_repuestos.html", movimientos=rows)
+
+
+@app.route("/ordenes/<int:oid>/consumir", methods=["POST"])
+def consumir_repuesto(oid):
+    try:
+        rid = int(request.form.get("repuesto_id", ""))
+        cantidad = int(request.form.get("cantidad", ""))
+    except ValueError:
+        abort(400)
+    if cantidad <= 0:
+        flash("La cantidad consumida debe ser un número entero positivo.", "error")
+        return redirect(url_for("orden_detalle", oid=oid))
+    observacion = request.form.get("observacion", "").strip()
+    with connect() as con:
+        orden = con.execute("SELECT id,asignado_a,estado FROM ordenes_trabajo WHERE id=?", (oid,)).fetchone()
+        if not orden:
+            abort(404)
+        # Un trabajador solo registra consumos en una orden que tenga asignada.
+        if g.user["rol"] == "Trabajador" and orden["asignado_a"] != g.user["id"]:
+            abort(403)
+        if orden["estado"] == "Finalizada":
+            flash("No es posible registrar consumos en una orden finalizada.", "error")
+            return redirect(url_for("orden_detalle", oid=oid))
+        # Actualización atómica: jamás permite existencias negativas aun con múltiples usuarios.
+        actualizado = con.execute("""UPDATE repuestos SET stock=stock-?
+            WHERE id=? AND stock>=?""", (cantidad,rid,cantidad))
+        if actualizado.rowcount != 1:
+            flash("Repuesto inexistente o stock insuficiente. No se registró el consumo.", "error")
+            return redirect(url_for("orden_detalle", oid=oid))
+        con.execute("""INSERT INTO movimientos_repuestos
+            (repuesto_id,orden_id,tipo,cantidad,usuario_id,observacion)
+            VALUES(?,?,'Consumo',?,?,?)""", (rid,oid,cantidad,g.user["id"],observacion))
+    flash("Consumo de repuesto registrado en la orden.", "success")
+    return redirect(url_for("orden_detalle", oid=oid))
+
 
 @app.route("/historial")
 def historial():

@@ -1,0 +1,11 @@
+SIGAM v4.5 — Gestión de repuestos e inventario
+
+Se incorpora un módulo básico para registrar repuestos, consultar existencias,
+realizar entradas de stock y registrar consumos asociados a órdenes de trabajo.
+Incluye alertas de stock bajo, historial de movimientos, permisos por rol y
+validación para impedir consumos superiores al inventario disponible.
+Se conservan las funcionalidades anteriores y la base SQLite se actualiza sin
+eliminar información existente.
+
+Validación: se agregan 11 pruebas nuevas de v4.5; ejecutarlas junto con las
+12 pruebas previas mediante EJECUTAR_PRUEBAS.bat.

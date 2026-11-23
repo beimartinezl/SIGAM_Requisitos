@@ -45,7 +45,7 @@ SQLite está configurado con claves foráneas, espera breve ante escrituras simu
 
 ## Alcance académico y seguridad
 
-Esta versión implementa acceso compartido en red local con una base de datos centralizada. **No implementa modo offline, sincronización posterior entre bases independientes, autenticación, cuentas individuales ni permisos por rol.** Los usuarios de la red autorizada pueden acceder a las funciones disponibles. Por ello, úsala solo en una red privada y de confianza, con datos de demostración; no la expongas directamente a Internet ni la consideres lista para producción. Para una operación real se necesitarán autenticación, autorización, HTTPS, respaldos automatizados, auditoría y un servidor de despliegue apropiado.
+Esta versión implementa acceso compartido en red local con una base de datos centralizada. **No implementa modo offline ni sincronización posterior entre bases independientes.** Incluye autenticación y roles desde v4.2, pero su uso sigue limitado a una red privada de confianza. Por ello, úsala solo en una red privada y de confianza, con datos de demostración; no la expongas directamente a Internet ni la consideres lista para producción. Para una operación real se necesitarán autenticación, autorización, HTTPS, respaldos automatizados, auditoría y un servidor de despliegue apropiado.
 
 ## Funciones del MVP
 
@@ -105,3 +105,24 @@ El reinicio elimina también las cuentas de usuarios, los activos, los avisos y 
 ### Pruebas
 
 Ejecuta `EJECUTAR_PRUEBAS.bat` en Windows. Incluye las pruebas de importación Excel de v4.3 y las pruebas de mantenimiento v4.4. Usan bases temporales y no modifican `sigam.db`.
+
+
+## SIGAM v4.5 — Repuestos y control básico de inventario
+
+- **Repuestos:** desde el menú lateral, los administradores y supervisores pueden registrar repuestos con código único, nombre, unidad de medida y stock mínimo. El stock inicial es cero.
+- **Entradas:** agregan existencias y registran fecha, cantidad, usuario y observación. Solo las pueden registrar administradores y supervisores.
+- **Consumo por orden:** desde el detalle de una orden se registra la cantidad utilizada; el sistema descuenta existencias y relaciona el movimiento con la orden de trabajo.
+- **Permisos:** administradores y supervisores pueden consumir en órdenes abiertas; un trabajador solo puede registrar consumos en órdenes que tenga asignadas. No se permite consumo en órdenes finalizadas.
+- **Control:** no se permite una cantidad negativa o cero, ni consumir más de lo disponible. Se muestra “Stock bajo” cuando las existencias son menores o iguales al mínimo.
+- **Trazabilidad:** el listado “Ver movimientos” presenta los últimos 300 movimientos con su usuario y orden asociada (si corresponde). Los movimientos se conservan al reiniciar la aplicación.
+- **Compatibilidad:** SIGAM crea automáticamente las tablas nuevas al abrir una base v4.4; conserva los registros previos. `REINICIAR_BASE_DATOS.bat` sigue siendo una operación **opcional y destructiva** que debe realizarse con SIGAM cerrado, no una actualización necesaria.
+
+### Actualizar desde v4.4 sin perder datos
+
+1. Cierra la aplicación (`Ctrl+C` en la ventana del servidor) y verifica que los demás usuarios estén desconectados.
+2. Respalda la carpeta de v4.4, incluido `sigam.db` y, si existe, `.sigam_secret_key`.
+3. Descomprime la nueva carpeta `SIGAM` **en una ubicación nueva** y copia en ella los archivos existentes `sigam.db` y `.sigam_secret_key`. Si tienes archivos `sigam.db-wal` o `sigam.db-shm`, vuelve a comprobar que la app esté realmente detenida antes de mover la base.
+4. Inicia `INICIAR_SIGAM.bat`. Las tablas de inventario se crearán automáticamente sin borrar las anteriores.
+5. Ejecuta `EJECUTAR_PRUEBAS.bat`. Las pruebas utilizan bases temporales y no deben afectar tu base real.
+
+**Límites de v4.5:** inventario simplificado con cantidades enteras; no incluye proveedores, compras, costos, unidades fraccionarias ni reposición automática. El sistema sigue siendo un MVP académico LAN + SQLite.
