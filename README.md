@@ -150,3 +150,12 @@ Para empezar una base desde cero puedes usar `REINICIAR_BASE_DATOS.bat`, que gua
 
 ## v4.7 - Indicadores y reportes
 La sección **Indicadores y reportes** está disponible para Administrador y Supervisor. Permite filtrar avisos y órdenes por fecha del aviso (ambos extremos incluidos) y exportar CSV con punto y coma, UTF-8 y protección básica contra fórmulas de Excel. Activos, stock bajo y preventivos vencidos son indicadores actuales, sin filtro histórico. Los datos siguen en SQLite y se preservan al actualizar.
+
+
+## v4.8 - Panel gráfico para Windows
+
+Abre **ABRIR_PANEL_SIGAM.bat** en el computador servidor. En el primer inicio instala las dependencias (requiere Internet); después aparecerá un panel de escritorio para iniciar/detener el servidor, abrir la web, consultar el acceso LAN, respaldar SQLite y reiniciar la base con confirmación. Se necesita Python 3.10+ con **tkinter** (incluido normalmente en Python para Windows). La interfaz **no es un .exe autónomo**: usa Python instalado en el computador.
+
+**Con pruebas** contiene carpeta `tests/`, `requirements-dev.txt` y `EJECUTAR_PRUEBAS.bat`. **Sin pruebas** contiene exactamente el mismo programa y panel, pero no incluye los archivos para ejecutar las pruebas. Las pruebas removidas del paquete final no reducen sus controles de acceso ni cambian el código de la aplicación.
+
+Para migrar datos: cierra SIGAM, guarda una copia del archivo `sigam.db` antiguo y colócalo en la carpeta SIGAM v4.8. Al iniciar, las tablas nuevas se crean automáticamente. No copies una base de datos que esté siendo escrita.
