@@ -126,3 +126,23 @@ Ejecuta `EJECUTAR_PRUEBAS.bat` en Windows. Incluye las pruebas de importación E
 5. Ejecuta `EJECUTAR_PRUEBAS.bat`. Las pruebas utilizan bases temporales y no deben afectar tu base real.
 
 **Límites de v4.5:** inventario simplificado con cantidades enteras; no incluye proveedores, compras, costos, unidades fraccionarias ni reposición automática. El sistema sigue siendo un MVP académico LAN + SQLite.
+
+
+## SIGAM v4.6 — Mantenimiento preventivo y entrega de turno
+
+- **Preventivos:** administradores y supervisores crean planes por equipo activo, con título, instrucciones, frecuencia en días, primera fecha y checklist (una tarea por línea). Pueden pausar y reactivar planes.
+- **Calendario simplificado:** el listado permite filtrar planes vencidos/pendientes, programados y pausados. No hay calendario gráfico mensual ni avisos automáticos por correo.
+- **Checklist:** cualquier usuario autenticado puede registrar una ejecución, pero solo si marca todas las tareas y el plan está activo. Se conserva responsable, fecha, observaciones y tareas realizadas. Al completar, la próxima fecha se calcula a partir del día de ejecución más la frecuencia configurada.
+- **Entrega de turno:** se registra fecha, turno (mañana/tarde/noche), novedades y pendientes; se conserva autor e historial reciente. No se crea automáticamente una orden de trabajo desde la entrega.
+- **Compatibilidad:** se agregan tablas nuevas a la misma base SQLite al iniciar SIGAM v4.6. No borra las existentes. Sigue funcionando en LAN con una base central. No tiene sincronización offline.
+- **Pruebas:** incluye 12 pruebas nuevas en `tests/test_v46_preventivos.py`, además de las 23 de versiones anteriores. Ejecuta `EJECUTAR_PRUEBAS.bat` para verificar las 35 pruebas.
+
+### Actualización desde v4.5
+
+1. Cierra SIGAM en el computador servidor y verifica que nadie más lo esté usando.
+2. Haz una copia de seguridad de la carpeta anterior, incluyendo `sigam.db` y `.sigam_secret_key` (si existe).
+3. Descomprime v4.6 en una carpeta nueva y copia `sigam.db` y `.sigam_secret_key` a la nueva carpeta `SIGAM`.
+4. Ejecuta `INICIAR_SIGAM.bat`: se crearán las tablas preventivas y de turnos sin borrar el inventario, órdenes ni usuarios.
+5. Ejecuta `EJECUTAR_PRUEBAS.bat` para validar. Las pruebas utilizan bases de datos temporales.
+
+Para empezar una base desde cero puedes usar `REINICIAR_BASE_DATOS.bat`, que guarda un respaldo previo. **No es necesario ni recomendable reiniciar la base para actualizar.**
