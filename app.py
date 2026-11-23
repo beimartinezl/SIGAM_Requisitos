@@ -6,7 +6,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_wtf.csrf import CSRFProtect
 from pathlib import Path
 from datetime import date, timedelta
-from io import BytesIO
+from io import BytesIO, StringIO
+import csv
+from datetime import datetime
+from flask import Response
 
 app = Flask(__name__)
 # La clave se conserva entre reinicios. En despliegues administrados debe definirse SIGAM_SECRET_KEY.
@@ -239,7 +242,7 @@ def load_user_and_enforce_access():
 
     role = g.user["rol"]
     admin_only = {"usuarios", "usuario_nuevo", "usuario_estado", "usuario_actualizar", "prueba"}
-    supervisor_or_admin = {"activo_form", "desactivar_activo", "crear_orden", "importar_activos", "asignar_orden", "prueba_retorno", "repuesto_nuevo", "repuesto_entrada", "preventivo_nuevo", "preventivo_estado"}
+    supervisor_or_admin = {"activo_form", "desactivar_activo", "crear_orden", "importar_activos", "asignar_orden", "prueba_retorno", "repuesto_nuevo", "repuesto_entrada", "preventivo_nuevo", "preventivo_estado", "reportes", "exportar_reporte"}
     if endpoint == "orden_detalle" and request.method == "POST":
         supervisor_or_admin.add(endpoint)
     if endpoint in admin_only and role != "Administrador":
@@ -897,6 +900,91 @@ def turnos():
         entregas = con.execute("""SELECT t.*,u.nombre AS autor_nombre FROM entregas_turno t
             LEFT JOIN usuarios u ON u.id=t.autor_id ORDER BY t.fecha DESC,t.id DESC LIMIT 100""").fetchall()
     return render_template('turnos.html',entregas=entregas,hoy=date.today().isoformat())
+
+
+def _rango_reporte():
+    """Valida fecha ISO estrictamente; fechas vacías equivalen a sin filtro."""
+    desde = request.args.get("desde", "").strip()
+    hasta = request.args.get("hasta", "").strip()
+    for valor in (desde, hasta):
+        if valor:
+            try:
+                if date.fromisoformat(valor).isoformat() != valor:
+                    abort(400)
+            except ValueError:
+                abort(400)
+    if desde and hasta and desde > hasta:
+        abort(400)
+    return desde, hasta
+
+
+def _report_data(desde, hasta):
+    """Indicadores simples y auditables sin mutar la base de datos."""
+    f = " AND (?='' OR v.fecha>=?) AND (?='' OR v.fecha<=?)"
+    params = (desde, desde, hasta, hasta)
+    with connect() as con:
+        avisos = con.execute("""SELECT v.fecha, a.codigo, a.nombre, v.descripcion,
+            v.prioridad, v.estado, o.id AS orden_id, o.estado AS orden_estado
+            FROM avisos v JOIN activos a ON a.id=v.activo_id
+            LEFT JOIN ordenes_trabajo o ON o.aviso_id=v.id
+            WHERE 1=1""" + f + " ORDER BY v.fecha DESC, v.id DESC", params).fetchall()
+        agrupado = con.execute("""SELECT v.prioridad, COUNT(*) AS total
+            FROM avisos v WHERE 1=1""" + f +
+            " GROUP BY v.prioridad", params).fetchall()
+        # Las órdenes se incluyen según la fecha del aviso que las originó.
+        estados = con.execute("""SELECT o.estado, COUNT(*) AS total
+            FROM ordenes_trabajo o JOIN avisos v ON v.id=o.aviso_id
+            WHERE 1=1""" + f + " GROUP BY o.estado", params).fetchall()
+        preventivos = con.execute("""SELECT COUNT(*) FROM planes_preventivos
+            WHERE activo=1 AND proxima_fecha < ?""", (date.today().isoformat(),)).fetchone()[0]
+        stock_bajo = con.execute("""SELECT COUNT(*) FROM repuestos
+            WHERE stock <= stock_minimo""").fetchone()[0]
+        activos = con.execute("SELECT COUNT(*) FROM activos WHERE estado='Activo'").fetchone()[0]
+    conteo_estados = {r['estado']: r['total'] for r in estados}
+    return {
+        'avisos': avisos,
+        'total_avisos': len(avisos),
+        'total_ordenes': sum(conteo_estados.values()),
+        'pendientes': conteo_estados.get('Pendiente', 0),
+        'en_progreso': conteo_estados.get('En progreso', 0),
+        'finalizadas': conteo_estados.get('Finalizada', 0),
+        'prioridades': {r['prioridad']: r['total'] for r in agrupado},
+        'preventivos_vencidos': preventivos,
+        'repuestos_bajos': stock_bajo,
+        'activos': activos,
+    }
+
+
+@app.route('/reportes')
+def reportes():
+    desde, hasta = _rango_reporte()
+    data = _report_data(desde, hasta)
+    return render_template('reportes.html', datos=data, desde=desde, hasta=hasta)
+
+
+def _celda_csv(valor):
+    """Evita interpretación de fórmulas al abrir un CSV con Excel."""
+    texto = str(valor if valor is not None else '')
+    if texto.lstrip().startswith(('=', '+', '-', '@', '\t', '\r', '\n')):
+        return "'" + texto
+    return texto
+
+
+@app.route('/reportes/exportar.csv')
+def exportar_reporte():
+    desde, hasta = _rango_reporte()
+    datos = _report_data(desde, hasta)
+    salida = StringIO()
+    escritor = csv.writer(salida, delimiter=';')
+    escritor.writerow(['Fecha aviso', 'Código activo', 'Activo', 'Descripción',
+                       'Prioridad', 'Estado aviso', 'Orden', 'Estado orden'])
+    for r in datos['avisos']:
+        escritor.writerow([_celda_csv(v) for v in (r['fecha'], r['codigo'], r['nombre'],
+            r['descripcion'], r['prioridad'], r['estado'], r['orden_id'], r['orden_estado'])])
+    # UTF-8 BOM mejora la lectura de acentos en Excel para Windows.
+    return Response('\ufeff' + salida.getvalue(), mimetype='text/csv; charset=utf-8',
+                    headers={'Content-Disposition': 'attachment; filename="sigam_reporte_avisos.csv"',
+                             'Cache-Control': 'no-store'})
 
 
 @app.route("/historial")

@@ -24,6 +24,9 @@
   <a href="{{ url_for('repuestos') }}" class="{{ 'active' if request.endpoint in ['repuestos','repuesto_nuevo','repuesto_entrada','movimientos_repuestos'] else '' }}">▤ <span>Repuestos</span></a>
   <a href="{{ url_for('preventivos') }}" class="{{ 'active' if request.endpoint in ['preventivos','preventivo_nuevo','preventivo_detalle','preventivo_ejecutar','preventivo_estado'] else '' }}">◴ <span>Preventivos</span></a>
   <a href="{{ url_for('turnos') }}" class="{{ 'active' if request.endpoint=='turnos' else '' }}">⇄ <span>Entrega de turno</span></a>
+  {% if g.user.rol in ['Administrador','Supervisor'] %}
+  <a href="{{ url_for('reportes') }}" class="{{ 'active' if request.endpoint in ['reportes','exportar_reporte'] else '' }}">▥ <span>Indicadores y reportes</span></a>
+  {% endif %}
   <a href="{{ url_for('historial') }}" class="{{ 'active' if request.endpoint=='historial' else '' }}">◷ <span>Historial</span></a>
   {% if g.user.rol == 'Administrador' %}
   <a href="{{ url_for('usuarios') }}" class="{{ 'active' if request.endpoint in ['usuarios','usuario_nuevo','usuario_estado'] else '' }}">♙ <span>Usuarios</span></a>

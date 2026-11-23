@@ -1,5 +1,3 @@
-SIGAM v4.6 — Mantenimiento preventivo y entregas de turno
+SIGAM v4.7 – Indicadores y reportes
 
-Se añade la programación de mantenimientos periódicos por equipo, con fechas de vencimiento, checklist de tareas, historial de ejecuciones y recálculo de la próxima fecha. También se incorpora un registro de entregas de turno con pendientes y responsable.
-
-Incluye validaciones, permisos por rol y 12 pruebas nuevas. Mantiene las funciones de versiones anteriores y migra la base SQLite sin borrar datos.
+Se incorpora un panel con indicadores de activos, avisos, órdenes, preventivos vencidos y repuestos en stock mínimo. Incluye filtros por fecha de aviso y exportación de detalles a CSV compatible con Excel. Se mantienen las funciones y datos de versiones anteriores, con controles de acceso para administración y supervisión.
