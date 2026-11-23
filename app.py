@@ -75,14 +75,29 @@ def init_db():
             descripcion TEXT NOT NULL,
             prioridad TEXT NOT NULL,
             estado TEXT NOT NULL DEFAULT 'Pendiente',
-            creada_en TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            creada_en TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            asignado_a INTEGER REFERENCES usuarios(id),
+            asignada_en TEXT,
+            prueba_retorno TEXT NOT NULL DEFAULT 'Pendiente',
+            observaciones_retorno TEXT NOT NULL DEFAULT ''
         );
         CREATE TABLE IF NOT EXISTS intervenciones (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             orden_id INTEGER NOT NULL REFERENCES ordenes_trabajo(id),
             descripcion TEXT NOT NULL,
             fecha TEXT NOT NULL,
-            responsable TEXT NOT NULL
+            responsable TEXT NOT NULL,
+            hora_inicio TEXT NOT NULL DEFAULT '',
+            hora_fin TEXT NOT NULL DEFAULT '',
+            resultado TEXT NOT NULL DEFAULT ''
+        );
+        CREATE TABLE IF NOT EXISTS historial_asignaciones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            orden_id INTEGER NOT NULL REFERENCES ordenes_trabajo(id),
+            usuario_id INTEGER REFERENCES usuarios(id),
+            asignado_por INTEGER REFERENCES usuarios(id),
+            fecha TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            observacion TEXT NOT NULL DEFAULT ''
         );
         CREATE TABLE IF NOT EXISTS suscripcion (
             id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -101,6 +116,24 @@ def init_db():
             fecha TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
         """)
+        # Migración incremental: preserva las bases creadas con SIGAM v4.3.
+        for tabla, campos in {
+            "ordenes_trabajo": {
+                "asignado_a": "INTEGER REFERENCES usuarios(id)",
+                "asignada_en": "TEXT",
+                "prueba_retorno": "TEXT NOT NULL DEFAULT 'Pendiente'",
+                "observaciones_retorno": "TEXT NOT NULL DEFAULT ''",
+            },
+            "intervenciones": {
+                "hora_inicio": "TEXT NOT NULL DEFAULT ''",
+                "hora_fin": "TEXT NOT NULL DEFAULT ''",
+                "resultado": "TEXT NOT NULL DEFAULT ''",
+            },
+        }.items():
+            actuales = {fila["name"] for fila in con.execute(f"PRAGMA table_info({tabla})")}
+            for nombre, definicion in campos.items():
+                if nombre not in actuales:
+                    con.execute(f"ALTER TABLE {tabla} ADD COLUMN {nombre} {definicion}")
 
 # Inicializa las tablas también al ejecutar con un servidor WSGI (por ejemplo Gunicorn).
 init_db()
@@ -144,7 +177,7 @@ def load_user_and_enforce_access():
 
     role = g.user["rol"]
     admin_only = {"usuarios", "usuario_nuevo", "usuario_estado", "usuario_actualizar", "prueba"}
-    supervisor_or_admin = {"activo_form", "desactivar_activo", "crear_orden", "importar_activos"}
+    supervisor_or_admin = {"activo_form", "desactivar_activo", "crear_orden", "importar_activos", "asignar_orden", "prueba_retorno"}
     if endpoint == "orden_detalle" and request.method == "POST":
         supervisor_or_admin.add(endpoint)
     if endpoint in admin_only and role != "Administrador":
@@ -431,7 +464,11 @@ def activo_detalle(aid):
         avisos = con.execute("""SELECT v.*, o.id AS orden_id, o.estado AS orden_estado
             FROM avisos v LEFT JOIN ordenes_trabajo o ON o.aviso_id=v.id
             WHERE v.activo_id=? ORDER BY v.id DESC""", (aid,)).fetchall()
-    return render_template("activo_detalle.html", activo=activo, avisos=avisos)
+        trabajos = con.execute("""SELECT i.*, o.id AS orden_id, o.prueba_retorno
+            FROM intervenciones i JOIN ordenes_trabajo o ON o.id=i.orden_id
+            JOIN avisos v ON v.id=o.aviso_id
+            WHERE v.activo_id=? ORDER BY i.fecha DESC, i.id DESC""", (aid,)).fetchall()
+    return render_template("activo_detalle.html", activo=activo, avisos=avisos, trabajos=trabajos)
 
 @app.route("/avisos")
 def avisos():
@@ -483,12 +520,50 @@ def ordenes():
             JOIN activos a ON a.id=v.activo_id ORDER BY o.id DESC""").fetchall()
     return render_template("ordenes.html", ordenes=rows)
 
+@app.route("/ordenes/<int:oid>/asignar", methods=["POST"])
+def asignar_orden(oid):
+    usuario_id = request.form.get("usuario_id", "").strip()
+    observacion = request.form.get("observacion", "").strip()
+    with connect() as con:
+        if not con.execute("SELECT id FROM ordenes_trabajo WHERE id=?", (oid,)).fetchone():
+            abort(404)
+        if usuario_id:
+            usuario = con.execute("SELECT id FROM usuarios WHERE id=? AND activo=1 AND rol IN ('Supervisor','Trabajador')", (usuario_id,)).fetchone()
+            if not usuario:
+                flash("Selecciona un trabajador o supervisor activo.", "error")
+                return redirect(url_for("orden_detalle", oid=oid))
+            usuario_id = usuario["id"]
+        else:
+            usuario_id = None
+        con.execute("UPDATE ordenes_trabajo SET asignado_a=?, asignada_en=CURRENT_TIMESTAMP WHERE id=?", (usuario_id, oid))
+        con.execute("INSERT INTO historial_asignaciones(orden_id,usuario_id,asignado_por,observacion) VALUES(?,?,?,?)",
+                    (oid, usuario_id, g.user["id"], observacion))
+    flash("Responsable de la orden actualizado.", "success")
+    return redirect(url_for("orden_detalle", oid=oid))
+
+
+@app.route("/ordenes/<int:oid>/prueba-retorno", methods=["POST"])
+def prueba_retorno(oid):
+    resultado = request.form.get("resultado", "")
+    observaciones = request.form.get("observaciones", "").strip()
+    if resultado not in ("Aprobada", "Rechazada", "No aplica"):
+        abort(400)
+    with connect() as con:
+        if not con.execute("SELECT id FROM ordenes_trabajo WHERE id=?", (oid,)).fetchone():
+            abort(404)
+        con.execute("UPDATE ordenes_trabajo SET prueba_retorno=?, observaciones_retorno=? WHERE id=?",
+                    (resultado, observaciones, oid))
+    flash("Verificación de retorno registrada.", "success")
+    return redirect(url_for("orden_detalle", oid=oid))
+
+
 @app.route("/ordenes/<int:oid>", methods=["GET","POST"])
 def orden_detalle(oid):
     with connect() as con:
         orden = con.execute("""SELECT o.*, v.fecha AS fecha_aviso, v.descripcion AS falla,
-            a.codigo, a.nombre AS activo_nombre FROM ordenes_trabajo o
-            JOIN avisos v ON v.id=o.aviso_id JOIN activos a ON a.id=v.activo_id WHERE o.id=?""", (oid,)).fetchone()
+            a.codigo, a.nombre AS activo_nombre, u.nombre AS asignado_nombre FROM ordenes_trabajo o
+            JOIN avisos v ON v.id=o.aviso_id JOIN activos a ON a.id=v.activo_id
+            LEFT JOIN usuarios u ON u.id=o.asignado_a WHERE o.id=?""", (oid,)).fetchone()
         if not orden: abort(404)
         if request.method == "POST":
             estado = request.form.get("estado")
@@ -497,21 +572,35 @@ def orden_detalle(oid):
             flash("Estado de la orden actualizado.", "success")
             return redirect(url_for("orden_detalle", oid=oid))
         intervenciones = con.execute("SELECT * FROM intervenciones WHERE orden_id=? ORDER BY id DESC", (oid,)).fetchall()
-    return render_template("orden_detalle.html", orden=orden, intervenciones=intervenciones, hoy=date.today().isoformat())
+        tecnicos = con.execute("SELECT id,nombre,rol FROM usuarios WHERE activo=1 AND rol IN ('Supervisor','Trabajador') ORDER BY nombre").fetchall()
+        asignaciones = con.execute("""SELECT h.*, u.nombre AS usuario_nombre, a.nombre AS autor_nombre
+            FROM historial_asignaciones h LEFT JOIN usuarios u ON u.id=h.usuario_id
+            LEFT JOIN usuarios a ON a.id=h.asignado_por WHERE h.orden_id=? ORDER BY h.id DESC""", (oid,)).fetchall()
+    return render_template("orden_detalle.html", orden=orden, intervenciones=intervenciones,
+                           tecnicos=tecnicos, asignaciones=asignaciones, hoy=date.today().isoformat())
 
 @app.route("/ordenes/<int:oid>/intervencion", methods=["POST"])
 def intervencion_nueva(oid):
     descripcion = request.form.get("descripcion","").strip()
     fecha = request.form.get("fecha") or date.today().isoformat()
-    responsable = request.form.get("responsable","").strip()
+    responsable = request.form.get("responsable", "").strip()
+    hora_inicio = request.form.get("hora_inicio", "").strip()
+    hora_fin = request.form.get("hora_fin", "").strip()
+    resultado = request.form.get("resultado", "").strip()
     if not descripcion or not responsable:
         flash("Completa la descripción y el responsable.", "error")
+    elif bool(hora_inicio) != bool(hora_fin) or (hora_inicio and hora_fin <= hora_inicio):
+        flash("Indica ambas horas y asegúrate de que el término sea posterior al inicio.", "error")
+    elif resultado not in ("", "Resuelto", "Pendiente", "Requiere seguimiento"):
+        flash("Resultado no válido.", "error")
     else:
         with connect() as con:
             exists = con.execute("SELECT id FROM ordenes_trabajo WHERE id=?", (oid,)).fetchone()
             if not exists: abort(404)
-            con.execute("INSERT INTO intervenciones(orden_id,descripcion,fecha,responsable) VALUES(?,?,?,?)",
-                        (oid,descripcion,fecha,responsable))
+            con.execute("""INSERT INTO intervenciones
+                (orden_id,descripcion,fecha,responsable,hora_inicio,hora_fin,resultado)
+                VALUES(?,?,?,?,?,?,?)""",
+                (oid,descripcion,fecha,responsable,hora_inicio,hora_fin,resultado))
             flash("Intervención registrada.", "success")
     return redirect(url_for("orden_detalle", oid=oid))
 

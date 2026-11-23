@@ -2,13 +2,13 @@
 setlocal
 cd /d "%~dp0"
 echo ==========================================
-echo     SIGAM v4.3 - PRUEBAS AUTOMATIZADAS
+echo     SIGAM v4.4 - PRUEBAS AUTOMATIZADAS
 echo ==========================================
 python --version
 if errorlevel 1 (echo ERROR: Python no esta instalado o no esta en PATH.& pause & exit /b 1)
 python -m pip install -r requirements.txt
 if errorlevel 1 (echo ERROR al instalar dependencias.& pause & exit /b 1)
-python -m pip install pytest
+python -m pip install -r requirements-dev.txt
 if errorlevel 1 (echo ERROR al instalar pytest.& pause & exit /b 1)
 python -m pytest tests -v
 set TEST_RESULT=%ERRORLEVEL%

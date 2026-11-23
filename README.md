@@ -56,6 +56,11 @@ Esta versión implementa acceso compartido en red local con una base de datos ce
 - Panel principal con indicadores básicos.
 - Apartado demostrativo de prueba y planes; no procesa pagos ni contrata servicios reales.
 
+## Prueba de usabilidad
+
+El objetivo académico es que una persona pueda registrar un aviso sencillo desde un celular en un máximo de 2 minutos. Este objetivo debe validarse con personas reales; el diseño por sí solo no demuestra que se cumpla.
+
+
 ## Cuentas y niveles de acceso (v4.2)
 
 Al iniciar SIGAM por primera vez, abre `http://127.0.0.1:5000/configurar` y crea la primera cuenta de Administrador. No existe una contraseña predeterminada. Después, cada usuario inicia sesión con su nombre de usuario y contraseña.
@@ -78,3 +83,25 @@ El sistema almacena contraseñas como hashes, utiliza protección CSRF en formul
 - Los códigos repetidos en el archivo o ya existentes en SIGAM se omiten y se informan.
 - Las filas válidas se guardan en la base central SQLite del servidor.
 - Se requiere `openpyxl`, incluido en `requirements.txt`.
+
+## SIGAM v4.4 — Asignaciones y verificación de mantenimiento
+
+- Administradores y supervisores pueden asignar órdenes a trabajadores o supervisores activos, reasignarlas y consultar el historial de cambios.
+- Las intervenciones pueden registrar horas de inicio y término, además de un resultado.
+- Administradores y supervisores pueden guardar una prueba de retorno: Aprobada, Rechazada o No aplica.
+- Las bases de datos existentes de v4.3 se actualizan automáticamente al iniciar v4.4, conservando los registros anteriores.
+- Los campos horarios admiten trabajos dentro del mismo día (hora de término posterior a la de inicio).
+
+### Reiniciar la base de datos
+
+1. **Cierra SIGAM** y asegúrate de que nadie esté usando el servidor.
+2. En el computador servidor, ejecuta `REINICIAR_BASE_DATOS.bat`.
+3. Lee la advertencia y escribe `REINICIAR` para confirmar.
+4. Se crea una copia de seguridad SQLite verificada en `respaldos/` antes de retirar la base activa.
+5. Ejecuta `INICIAR_SIGAM.bat`: SIGAM creará una base vacía y solicitará configurar el administrador inicial.
+
+El reinicio elimina también las cuentas de usuarios, los activos, los avisos y las órdenes. Los respaldos no se eliminan. **No ejecutes este proceso con el servidor en uso**. Para restaurar una copia, cierra SIGAM, respalda primero la base activa y copia el archivo `.db` del respaldo como `sigam.db`.
+
+### Pruebas
+
+Ejecuta `EJECUTAR_PRUEBAS.bat` en Windows. Incluye las pruebas de importación Excel de v4.3 y las pruebas de mantenimiento v4.4. Usan bases temporales y no modifican `sigam.db`.
