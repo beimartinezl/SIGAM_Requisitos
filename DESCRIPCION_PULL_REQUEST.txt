@@ -1,3 +1,3 @@
-SIGAM v4.7 – Indicadores y reportes
+SIGAM v4.8 – Panel de control de escritorio
 
-Se incorpora un panel con indicadores de activos, avisos, órdenes, preventivos vencidos y repuestos en stock mínimo. Incluye filtros por fecha de aviso y exportación de detalles a CSV compatible con Excel. Se mantienen las funciones y datos de versiones anteriores, con controles de acceso para administración y supervisión.
+Se incorpora un panel gráfico local para iniciar y detener SIGAM, abrir la aplicación en el navegador, consultar la dirección LAN y crear respaldos SQLite verificados. También permite reiniciar la base con confirmación y respaldo previo, únicamente cuando el servidor esté detenido. Se conservan los módulos de mantenimiento, inventario, preventivos, turnos y reportes. Se ofrecen paquetes con y sin pruebas automatizadas.
